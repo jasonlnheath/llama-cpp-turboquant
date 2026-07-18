@@ -608,6 +608,19 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
     }
 #endif // GGML_CUDA_FA_ALL_QUANTS
 
+    // turbo kernels are instantiated only for head dims that are multiples of 64
+    // (turbo4: multiples of 128, matching its block size).
+    {
+        auto turbo_geom_ok = [](ggml_type t, int64_t ne0) {
+            if (t == GGML_TYPE_TURBO2_0 || t == GGML_TYPE_TURBO3_0) return ne0 % 64 == 0;
+            if (t == GGML_TYPE_TURBO4_0) return ne0 % 128 == 0;
+            return true;
+        };
+        if (!turbo_geom_ok(K->type, K->ne[0]) || !turbo_geom_ok(V->type, V->ne[0])) {
+            return BEST_FATTN_KERNEL_NONE;
+        }
+    }
+
     if (!ggml_cuda_fattn_kv_type_supported(K->type) || !ggml_cuda_fattn_kv_type_supported(V->type)) {
         return BEST_FATTN_KERNEL_NONE;
     }
