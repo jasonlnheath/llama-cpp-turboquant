@@ -592,6 +592,9 @@ struct common_params {
     common_moe_cache_params moe_cache;
     bool no_host           = false; // bypass host buffer allowing extra buffers to be used
 
+    std::string moe_cache_profile = ""; // MoE expert cache routing profile CSV (empty = disabled)
+    int32_t     moe_cache_slots   = 0;  // MoE expert cache slots per layer (0 = disabled)
+
     bool single_turn       = false; // single turn chat conversation
 
     ggml_type cache_type_k = GGML_TYPE_F16; // KV cache data type for the K
