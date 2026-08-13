@@ -761,6 +761,10 @@ static bool ggml_is_view_op(enum ggml_op op) {
 #define GGML_SCHED_MAX_COPIES 4
 #endif
 
+#ifndef GGML_SCHED_MAX_PREFETCH_SLOTS
+#define GGML_SCHED_MAX_PREFETCH_SLOTS 8
+#endif
+
 struct ggml_backend_sched_split {
     int backend_id;
     int i_start;
@@ -817,6 +821,19 @@ struct ggml_backend_sched {
     size_t context_buffer_size;
 
     bool op_offload;
+
+    // full-tensor prefetch of offloaded MUL_MAT_ID weights (GGML_SCHED_PREFETCH_EXPERTS)
+    // with a large batch virtually every expert is used, so the routing ids are not worth
+    // waiting for; uploads run through a second backend instance on the same device so
+    // they overlap compute, alternating between two staging slots
+    bool prefetch_experts;
+    ggml_backend_t prefetch_backend;
+    int prefetch_n_slots;
+    ggml_backend_buffer_t prefetch_slots[GGML_SCHED_MAX_PREFETCH_SLOTS];
+    ggml_backend_event_t prefetch_ready[GGML_SCHED_MAX_PREFETCH_SLOTS];
+    ggml_backend_event_t prefetch_free[GGML_SCHED_MAX_PREFETCH_SLOTS];
+    bool prefetch_used[GGML_SCHED_MAX_PREFETCH_SLOTS];
+    int prefetch_cur;
 
     int debug;
 
