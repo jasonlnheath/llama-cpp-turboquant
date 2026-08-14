@@ -632,15 +632,32 @@ void * llama_mmap::addr() const { return pimpl->addr; }
 void llama_mmap::unmap_fragment(size_t first, size_t last) { pimpl->unmap_fragment(first, last); }
 
 size_t llama_mmap::register_host(size_t first, size_t last, bool (*reg_fn)(void *, size_t), void (*unreg_fn)(void *)) {
-#ifdef _POSIX_MAPPED_FILES
+#if defined(_POSIX_MAPPED_FILES) || defined(_WIN32)
     if (host_reg_addr || !reg_fn || !unreg_fn || last <= first) {
         return 0;
     }
 
-    // expand outward to the page boundaries retained by unmap_fragment
+#if defined(_WIN32)
+    // MapViewOfFile yields an allocation-granularity-aligned view; the whole
+    // [0, size) range stays live because unmap_fragment() is a no-op on Windows.
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    const size_t page_size = si.dwPageSize;
+#else
     const size_t page_size = sysconf(_SC_PAGESIZE);
+#endif
+
+    // expand outward to the page boundaries retained by unmap_fragment
     first = first & ~(page_size - 1);
     last  = (last + page_size - 1) & ~(page_size - 1);
+
+    // clamp to the mapped view so we never register past its end
+    if (last > pimpl->size) {
+        last = pimpl->size;
+    }
+    if (last <= first) {
+        return 0;
+    }
 
     void * reg_addr = (uint8_t *) pimpl->addr + first;
     if (!reg_fn(reg_addr, last - first)) {
