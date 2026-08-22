@@ -123,6 +123,7 @@ llama_context::llama_context(
     cparams.embeddings_nextn        = false;
     cparams.embeddings_nextn_masked = false;
     cparams.offload_kqv             = params.offload_kqv;
+    cparams.sched_async_cpu         = params.sched_async_cpu;
     cparams.no_perf                 = params.no_perf;
     cparams.warmup                  = false;
 
@@ -716,6 +717,7 @@ void llama_context::sched_reserve() {
     ggml_backend_sched_set_moe_cache(
             sched.get(), moe_cache_mode,
             cparams.moe_cache_budget_mib);
+    ggml_backend_sched_set_async_cpu(sched.get(), cparams.sched_async_cpu);
 
     llama_memory_context_ptr mctx;
     if (memory) {
@@ -808,6 +810,7 @@ void llama_context::sched_reserve() {
                 ggml_backend_sched_set_moe_cache(
                         sched.get(), moe_cache_mode,
                         cparams.moe_cache_budget_mib);
+                ggml_backend_sched_set_async_cpu(sched.get(), cparams.sched_async_cpu);
                 gf = graph_reserve(n_tokens, n_seqs, n_outputs_pp, mctx.get());
             }
             if (!gf) {
@@ -3689,6 +3692,7 @@ llama_context_params llama_context_default_params() {
         /*.offload_kqv                 =*/ true,
         /*.no_perf                     =*/ true,
         /*.op_offload                  =*/ true,
+        /*.sched_async_cpu             =*/ true,
         /*.swa_full                    =*/ true,
         /*.kv_unified                  =*/ false,
         /*.sampler                     =*/ nullptr,
