@@ -879,6 +879,8 @@ private:
     bool set_clock_bound_for_test(const ggml_cuda_moe_grouped_acquisition & acquisition, uint64_t clock_bound);
     static bool probe_host_allocation_for_test(ggml_backend_buffer_type_t buft, size_t bytes, bool fail);
     static bool fail_host_staging_after_for_test(ggml_backend_buffer_type_t buft, int64_t callbacks);
+    static bool fail_source_register_after_for_test(ggml_backend_buffer_type_t buft, int64_t calls);
+    static size_t registered_prefix_bytes_for_test(ggml_backend_buffer_t buffer);
     bool admission_closed_for_test() const;
     bool has_device_resource_for_test(const ggml_cuda_moe_candidate_group_key & key) const;
     bool get_clock_bound_for_test(const ggml_cuda_moe_candidate_group_key & key, uint64_t * clock_bound) const;

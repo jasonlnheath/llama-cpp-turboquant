@@ -86,6 +86,14 @@ struct ggml_cuda_moe_grouped_context_test_access {
         return ggml_cuda_moe_grouped_context::fail_host_staging_after_for_test(buft, callbacks);
     }
 
+    static bool fail_source_register_after(ggml_backend_buffer_type_t buft, int64_t calls) {
+        return ggml_cuda_moe_grouped_context::fail_source_register_after_for_test(buft, calls);
+    }
+
+    static size_t registered_prefix_bytes(ggml_backend_buffer_t buffer) {
+        return ggml_cuda_moe_grouped_context::registered_prefix_bytes_for_test(buffer);
+    }
+
     static bool admission_closed(const ggml_cuda_moe_grouped_context & context) {
         return context.admission_closed_for_test();
     }
@@ -8060,6 +8068,37 @@ static void test_bounded_host_pinning() {
     fprintf(stderr, "test-moe-cache: bounded host staging, owner lifetime and concurrent contexts OK\n");
 }
 
+static void test_bounded_source_prefix_retry() {
+    ggml_backend_ptr backend(ggml_backend_cuda_init(0));
+    CHECK(backend != nullptr);
+    constexpr size_t limit = 64 * 1024 * 1024;
+    auto * buft = ggml_backend_cuda_moe_bounded_buffer_type(limit);
+    CHECK(buft != nullptr);
+    CHECK(ggml_backend_cuda_moe_reserve_host_staging_batch(buft, 64 * 1024, 1));
+
+    // One forced registration failure: the prefix must come back at a halved
+    // size, not fall to staging.
+    ggml_backend_buffer_ptr buffer(ggml_backend_buft_alloc_buffer(buft, 32 * 1024 * 1024));
+    CHECK(buffer != nullptr);
+    CHECK(ggml_cuda_moe_grouped_context_test_access::fail_source_register_after(buft, 1));
+    ggml_backend_cuda_moe_pin_sources(buffer.get(), false);
+    const size_t prefix = ggml_cuda_moe_grouped_context_test_access::registered_prefix_bytes(buffer.get());
+    CHECK(prefix >= 15 * 1024 * 1024 && prefix <= 17 * 1024 * 1024);
+    buffer.reset();
+
+    // Two forced failures land at the quarter prefix.
+    ggml_backend_buffer_ptr quarter(ggml_backend_buft_alloc_buffer(buft, 32 * 1024 * 1024));
+    CHECK(quarter != nullptr);
+    CHECK(ggml_cuda_moe_grouped_context_test_access::fail_source_register_after(buft, 2));
+    ggml_backend_cuda_moe_pin_sources(quarter.get(), false);
+    const size_t quarter_prefix = ggml_cuda_moe_grouped_context_test_access::registered_prefix_bytes(quarter.get());
+    CHECK(quarter_prefix >= 7 * 1024 * 1024 && quarter_prefix <= 9 * 1024 * 1024);
+    quarter.reset();
+
+    ggml_backend_cuda_moe_bounded_buffer_type_free(buft);
+    fprintf(stderr, "test-moe-cache: bounded source prefix retry OK\n");
+}
+
 static void test_active_grouped_materialization_eligibility() {
 #ifdef __linux__
     const bool old_debug_mm = ggml_backend_cuda_moe_get_debug_mm();
@@ -12368,7 +12407,12 @@ int main(int argc, char ** argv) {
     const bool legacy_phase_telemetry_only = argc == 2 && strcmp(argv[1], "--legacy-phase-telemetry-only") == 0;
     const bool gemma_q4_parity_only = argc == 2 && strcmp(argv[1], "--gemma-q4-parity-only") == 0;
     const bool prefill_resident_only = argc == 2 && strcmp(argv[1], "--prefill-resident-only") == 0;
+    const bool prefix_retry_only = argc == 2 && strcmp(argv[1], "--prefix-retry-only") == 0;
     test_moe_cache_proc_api();
+    if (prefix_retry_only) {
+        test_bounded_source_prefix_retry();
+        return 0;
+    }
     if (prefill_resident_only) {
         test_prefill_resident_biases();
         return 0;
@@ -12452,6 +12496,7 @@ int main(int argc, char ** argv) {
     test_active_grouped_multirow_graph_modes(dev);
     test_active_grouped_dispatch();
     test_bounded_host_pinning();
+    test_bounded_source_prefix_retry();
     test_bounded_host_pinning_limits(dev);
 
     // Toy parameters. Small enough to run in a few ms on any CUDA device,
