@@ -163,6 +163,7 @@ struct moe_host_budget {
     size_t staging_pinned = 0;
     uint32_t staging_misses = 1;
     std::atomic<int64_t> fail_stage_after{-1};
+    std::atomic<int64_t> fail_source_register_after{-1};
 
 #ifdef GGML_CUDA_MOE_PARALLEL_COPY
     moe_host_copy_worker copy_worker;
@@ -11777,23 +11778,58 @@ void ggml_backend_cuda_moe_pin_sources(ggml_backend_buffer_t buffer, bool read_o
     if (first >= last) {
         return;
     }
-    const size_t bytes = context->budget->reserve_source(last - first);
-    if (bytes == 0) {
-        return;
-    }
-    const auto error = cudaHostRegister(reinterpret_cast<void *>(first), bytes, flags);
-    if (error != cudaSuccess) {
+    // Retry with a smaller contiguous prefix before giving up to staging:
+    // banks outside any achieved prefix stay staged, so a reduced prefix
+    // is still a win. Halving, floored at the registration granularity.
+    const size_t remaining = static_cast<size_t>(last - first);
+    size_t bytes = context->budget->reserve_source(remaining);
+    while (bytes > 0) {
+        cudaError_t error = cudaSuccess;
+        if (context->budget->fail_source_register_after.load(std::memory_order_relaxed) > 0) {
+            context->budget->fail_source_register_after.fetch_sub(1, std::memory_order_relaxed);
+            error = cudaErrorUnknown;
+        } else {
+            error = cudaHostRegister(reinterpret_cast<void *>(first), bytes, flags);
+        }
+        if (error == cudaSuccess) {
+            context->registered = reinterpret_cast<void *>(first);
+            context->registered_bytes = bytes;
+            if (bytes < remaining) {
+                GGML_LOG_WARN("MoE host sources: registered a %zu-byte prefix of %zu bytes\n", bytes, remaining);
+            } else {
+                GGML_LOG_INFO("MoE host sources: registered %zu bytes in place\n", bytes);
+            }
+            return;
+        }
         (void) cudaGetLastError();
         context->budget->unreserve_source(bytes);
-        GGML_LOG_WARN("MoE source registration of %zu bytes failed: %s; using bounded staging\n", bytes, cudaGetErrorString(error));
-        return;
+        GGML_LOG_WARN("MoE source registration of %zu bytes failed: %s; trying a smaller prefix\n",
+                      bytes, cudaGetErrorString(error));
+        const size_t next = bytes / 2 / granularity * granularity;
+        bytes = next > 0 ? context->budget->reserve_source(next) : 0;
     }
-    context->registered = reinterpret_cast<void *>(first);
-    context->registered_bytes = bytes;
-    GGML_LOG_INFO("MoE host sources: registered %zu bytes in place\n", bytes);
+    GGML_LOG_WARN("MoE host sources: no prefix registered; using bounded staging\n");
 #else
     GGML_UNUSED(read_only);
 #endif
+}
+
+bool ggml_cuda_moe_grouped_context::fail_source_register_after_for_test(
+        ggml_backend_buffer_type_t buft, int64_t calls) {
+    auto * budget = moe_host_budget_for(buft);
+    if (budget == nullptr) {
+        return false;
+    }
+    budget->fail_source_register_after.store(calls, std::memory_order_relaxed);
+    return true;
+}
+
+size_t ggml_cuda_moe_grouped_context::registered_prefix_bytes_for_test(ggml_backend_buffer_t buffer) {
+    if (buffer == nullptr) {
+        return SIZE_MAX;
+    }
+    auto * context = static_cast<moe_bounded_buffer *>(buffer->context);
+    return context->registered != nullptr ? context->registered_bytes : 0;
 }
 
 namespace {
