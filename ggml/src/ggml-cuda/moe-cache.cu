@@ -9823,38 +9823,43 @@ static ggml_cuda_moe_cache * ggml_cuda_moe_cache_init_with_pool(
     }
 
 #if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA) && !defined(GGML_CUDA_NO_VMM) && CUDART_VERSION >= 12080
+    // The staging-overlap path is gated on stream memory operations. Probe the
+    // full write+wait cycle against device memory: the device attribute is
+    // advisory, and a write-only probe passes on platforms (WDDM) where the
+    // wait variant later faults. Any failure degrades to the event-barrier
+    // staging path instead of disabling the cache.
     bool can_use_stream_mem_ops = true;
-#if CUDA_VERSION < 13000
-    CUdevice cu_device;
-    int stream_mem_ops_attribute = 0;
-    can_use_stream_mem_ops =
-        cuDeviceGet(&cu_device, device) == CUDA_SUCCESS &&
-        cuDeviceGetAttribute(
-            &stream_mem_ops_attribute, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS_V1, cu_device) == CUDA_SUCCESS &&
-        stream_mem_ops_attribute != 0;
-#endif
+    {
+        CUdevice cu_device;
+        int stream_mem_ops_attribute = 0;
+        can_use_stream_mem_ops =
+            cuDeviceGet(&cu_device, device) == CUDA_SUCCESS &&
+            cuDeviceGetAttribute(
+                &stream_mem_ops_attribute, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS_V1, cu_device) == CUDA_SUCCESS &&
+            stream_mem_ops_attribute != 0;
+    }
     uint32_t * stream_mem_probe = nullptr;
     if (can_use_stream_mem_ops && cudaMalloc(&stream_mem_probe, sizeof(*stream_mem_probe)) == cudaSuccess) {
         if (cuStreamWriteValue32(
-                c->copy_stream, (CUdeviceptr) stream_mem_probe, 0, CU_STREAM_WRITE_VALUE_DEFAULT) == CUDA_SUCCESS) {
+                    c->copy_stream, (CUdeviceptr) stream_mem_probe, 1, CU_STREAM_WRITE_VALUE_DEFAULT) == CUDA_SUCCESS &&
+                cuStreamWaitValue32(
+                    c->copy_stream, (CUdeviceptr) stream_mem_probe, 1, CU_STREAM_WAIT_VALUE_EQ) == CUDA_SUCCESS) {
             err = cudaStreamSynchronize(c->copy_stream);
-            if (err != cudaSuccess) {
-                fprintf(stderr, "moe-cache: stream memory operation probe failed: %s\n", cudaGetErrorString(err));
+            if (err == cudaSuccess) {
+                c->stream_mem_ops_supported = true;
+            } else {
                 (void) cudaGetLastError();
-                (void) cudaFree(stream_mem_probe);
-                (void) cudaStreamDestroy(c->copy_stream);
-                if (c->owns_slot_pool) {
-                    (void) cudaFree(c->slot_pool_d);
-                }
-                delete c;
-                (void) cudaSetDevice(prev_device);
-                return nullptr;
             }
-            c->stream_mem_ops_supported = true;
+        } else {
+            (void) cudaGetLastError();
         }
         (void) cudaFree(stream_mem_probe);
+        (void) cudaGetLastError();
     } else {
         (void) cudaGetLastError();
+    }
+    if (!c->stream_mem_ops_supported) {
+        GGML_LOG_INFO("moe-cache: stream memory operations unavailable; staging overlap uses the event path\n");
     }
 #endif
 
