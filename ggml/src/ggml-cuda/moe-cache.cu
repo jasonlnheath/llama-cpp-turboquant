@@ -11201,8 +11201,14 @@ static ggml_backend_buffer_t ggml_backend_cuda_moe_cached_buffer_type_alloc_buff
 
     if (ptr == nullptr) {
         // Pinned alloc failed -- fall back to a regular CPU buffer. This costs
-        // PCIe bandwidth on cache miss but keeps the model loadable.
-        return ggml_backend_buft_alloc_buffer(ggml_backend_cpu_buffer_type(), size);
+        // PCIe bandwidth on cache miss but keeps the model loadable. Keep the
+        // cached buffer-type identity so the cache still runs on pageable
+        // sources: the CPU buffer's own free path stays intact.
+        ggml_backend_buffer_t fallback = ggml_backend_buft_alloc_buffer(ggml_backend_cpu_buffer_type(), size);
+        if (fallback != nullptr) {
+            fallback->buft = buft;
+        }
+        return fallback;
     }
 
     ggml_backend_buffer_t buffer = ggml_backend_cpu_buffer_from_ptr(ptr, size);
