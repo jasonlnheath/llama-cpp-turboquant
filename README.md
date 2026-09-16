@@ -16,6 +16,15 @@
 
 </div>
 
+## About this fork
+
+This fork carries the TurboQuant work on top of llama.cpp: KV-cache quantization
+and MoE expert-cache performance experiments. The `feature/turboquant-kv-cache`
+branch is the branch of record for fork development. Upstream is
+[GenerelSchwerz/llama.cpp](https://github.com/GenerelSchwerz/llama.cpp).
+
+Everything else in this README is stock llama.cpp documentation.
+
 ## Quick start
 
 A few options to get `llama.cpp` installed on your machine:
