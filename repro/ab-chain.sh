@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Chain A/B experiments overnight-style: each variant runs N minutes under the
-# v3 deep-context driver; results appended to ~/logs/ab-summary.log.
+# multi-client v4 driver; results appended to ~/logs/ab-summary.log.
 set -u
 cd "$(dirname "$0")"
 MINS="${1:-45}"

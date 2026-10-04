@@ -6,7 +6,7 @@
 #   special extra arg NOSPEC -> omit the --spec-type draft-mtp flags entirely
 # Env for the server can be injected via AB_ENV="GGML_CUDA_PDL=0" ab-run.sh ...
 # Plan v2: legs run the multi-client v4 driver (production-like interleave).
-# DRIVER=v2 env reverts to the single-client v2 driver.
+# DRIVER env selects an alternative load-driver-<name>.sh in this directory.
 set -u
 LABEL="$1"; MINS="$2"; shift 2
 # AB_BIN overrides the server binary (default: the crashed production build;
