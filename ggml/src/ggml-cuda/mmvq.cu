@@ -1223,8 +1223,9 @@ void ggml_cuda_mul_mat_vec_q(
     const float   * src1_d =       (const float   *) src1->data;
     const int32_t *  ids_d = ids ? (const int32_t *)  ids->data : nullptr;
 
-    if (ids) {
+    if (ids && (dst->op != GGML_OP_MUL_MAT_ID || dst->op_params[0] != 0)) {
         // slots with expert id -1 (hot/cold expert split) are skipped by the kernels; zero their dst rows
+        // (fused calls pass a non-id dst; only a MUL_MAT_ID dst carries the skip announcement)
         ggml_cuda_launch_mm_ids_zero_skipped_rows(ids_d, (float *) dst->data,
             dst->ne[0], ids->ne[1], ids->ne[0], ids->nb[1]/sizeof(int32_t),
             dst->nb[1]/sizeof(float), dst->nb[2]/sizeof(float), ctx.stream());

@@ -930,6 +930,33 @@ struct ggml_backend_sched_split {
     struct ggml_cgraph graph;
 };
 
+// sets the thread-local MoE-cache provider scope for the duration of a graph
+// compute; used by the scheduler on the main thread and by the async CPU worker
+struct moe_cache_scope {
+    void * session;
+    void (*leave)(void *);
+    ggml_moe_cache_api previous_active;
+
+    explicit moe_cache_scope(void * session, void (*enter)(void *),
+                             void (*leave_fn)(void *),
+                             const ggml_moe_cache_api & active_api)
+        : session(session), leave(leave_fn), previous_active(t_moe_cache_active) {
+        t_moe_cache_active = active_api;
+        if (enter && leave) {
+            enter(session);
+        } else {
+            leave = nullptr;
+        }
+    }
+
+    ~moe_cache_scope() {
+        t_moe_cache_active = previous_active;
+        if (leave) {
+            leave(session);
+        }
+    }
+};
+
 // async execution of CPU splits (ggml_backend_sched_set_async_cpu): a persistent worker
 // computes a CPU split while the main thread keeps launching later splits that
 // do not depend on it, so an independent GPU split overlaps the CPU compute
@@ -939,6 +966,8 @@ struct ggml_sched_cpu_async {
     std::condition_variable cv;
     ggml_backend_t          job_backend = nullptr;
     struct ggml_cgraph *    job_graph   = nullptr;
+    void *                  job_moe_cache_session = nullptr;
+    struct ggml_moe_cache_api job_moe_cache_api;
     enum ggml_status        job_status  = GGML_STATUS_SUCCESS;
     bool                    job_ready   = false;
     bool                    job_done    = false;
@@ -954,11 +983,22 @@ struct ggml_sched_cpu_async {
                     return;
                 }
                 job_ready = false;
-                ggml_backend_t   backend = job_backend;
-                ggml_cgraph *    graph   = job_graph;
+                ggml_backend_t     backend = job_backend;
+                ggml_cgraph *      graph   = job_graph;
+                void *             moe_cache_session = job_moe_cache_session;
+                ggml_moe_cache_api moe_cache_api     = job_moe_cache_api;
                 lock.unlock();
 
-                enum ggml_status status = ggml_backend_graph_compute_async(backend, graph);
+                enum ggml_status status;
+                {
+                    // the worker's thread-local provider stack is otherwise empty,
+                    // which would silently disable the expert cache on CPU splits
+                    moe_cache_scope cache_scope(moe_cache_session,
+                                                moe_cache_api.session_enter,
+                                                moe_cache_api.session_leave,
+                                                moe_cache_api);
+                    status = ggml_backend_graph_compute_async(backend, graph);
+                }
 
                 lock.lock();
                 job_status = status;
@@ -977,11 +1017,14 @@ struct ggml_sched_cpu_async {
         worker.join();
     }
 
-    void launch(ggml_backend_t backend, struct ggml_cgraph * graph) {
+    void launch(ggml_backend_t backend, struct ggml_cgraph * graph,
+                void * moe_cache_session, const struct ggml_moe_cache_api & moe_cache_api) {
         {
             std::lock_guard<std::mutex> lock(mtx);
             job_backend = backend;
             job_graph   = graph;
+            job_moe_cache_session = moe_cache_session;
+            job_moe_cache_api     = moe_cache_api;
             job_status  = GGML_STATUS_SUCCESS;
             job_done    = false;
             job_ready   = true;
@@ -1937,33 +1980,10 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
         // a job left over from an aborted eval references stale split memory - drain it
         sched->cpu_async->join();
     }
-    struct moe_cache_scope {
-        void * session;
-        void (*leave)(void *);
-        ggml_moe_cache_api previous_active;
-
-        explicit moe_cache_scope(void * session, void (*enter)(void *),
-                                 void (*leave_fn)(void *),
-                                 const ggml_moe_cache_api & active_api)
-            : session(session), leave(leave_fn), previous_active(t_moe_cache_active) {
-            t_moe_cache_active = active_api;
-            if (enter && leave) {
-                enter(session);
-            } else {
-                leave = nullptr;
-            }
-        }
-
-        ~moe_cache_scope() {
-            t_moe_cache_active = previous_active;
-            if (leave) {
-                leave(session);
-            }
-        }
-    } cache_scope(sched->moe_cache_session,
-                  sched->moe_cache_api.session_enter,
-                  sched->moe_cache_api.session_leave,
-                  sched->moe_cache_api);
+    moe_cache_scope cache_scope(sched->moe_cache_session,
+                                sched->moe_cache_api.session_enter,
+                                sched->moe_cache_api.session_leave,
+                                sched->moe_cache_api);
 
     ggml_tensor * prev_ids_tensor = nullptr;
     std::vector<int32_t> ids;
@@ -2164,7 +2184,8 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
             if (sched->cpu_async && split_backend_id == sched->n_backends - 1 && split_prefetch_slot == -1) {
                 // run the CPU split on the worker; the loop continues launching
                 // later splits until one depends on this split's outputs
-                sched->cpu_async->launch(split_backend, &split->graph);
+                sched->cpu_async->launch(split_backend, &split->graph,
+                                         sched->moe_cache_session, sched->moe_cache_api);
                 continue;
             }
             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
