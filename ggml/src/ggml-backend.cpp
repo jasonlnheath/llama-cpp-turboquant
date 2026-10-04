@@ -2171,6 +2171,9 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 prefetch_input_cpy->data   = prefetch_saved_data;
             }
             if (ec != GGML_STATUS_SUCCESS) {
+                if (sched->cpu_async) {
+                    sched->cpu_async->join();
+                }
                 return ec;
             }
         } else {
@@ -2193,6 +2196,9 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
                 enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
                 if (ec != GGML_STATUS_SUCCESS) {
+                    if (sched->cpu_async) {
+                        sched->cpu_async->join();
+                    }
                     return ec;
                 }
 

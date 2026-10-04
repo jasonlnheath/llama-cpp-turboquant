@@ -17,7 +17,7 @@ DRVLOG="$HOME/logs/ab-$LABEL-driver.log"
 SUM="$HOME/logs/ab-summary.log"
 
 # stop whatever server is running on 8037 (systemd instance or previous ab instance)
-pid=$(pgrep -f 'llama-server.*--port 8037' | head -1)
+pid=$(ss -tlnp 'sport = :8037' 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | head -1)
 if [ -n "$pid" ]; then kill -TERM "$pid" 2>/dev/null; for i in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done; fi
 sleep 2
 
