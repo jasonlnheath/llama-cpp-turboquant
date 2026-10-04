@@ -25,7 +25,7 @@ echo ""
 
 # --- Test 1: Perplexity ---
 echo "[1/2] Running perplexity check (8 chunks)..."
-PPL_TURBO=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 512 -ctk turbo3 -ctv turbo3 -fa on --chunks 8 -ngl 99 2>&1 | grep "Final" | grep -oE 'PPL = [0-9.]+' | grep -oE '[0-9.]+')
+PPL_TURBO=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 512 -ctk turbo3 -ctv turbo3 -fa on --chunks 8 -ngl 99 2>&1 | grep "Final" | grep -oE 'PPL = [0-9.]+' | grep -oE '[0-9.]+' || true)
 
 if [ -z "$PPL_TURBO" ]; then
     echo "  FAIL: Could not get turbo3 perplexity (crash or timeout)"
@@ -45,8 +45,8 @@ echo ""
 
 # --- Test 2: Context Scaling ---
 echo "[2/2] Running context scaling check (4K prefill)..."
-TURBO_TPS=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 4096 -ctk turbo3 -ctv turbo3 -fa on --chunks 4 -ngl 99 2>&1 | grep "prompt eval" | grep -oE '[0-9.]+ tokens per second' | grep -oE '[0-9.]+')
-Q8_TPS=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 4096 -ctk q8_0 -ctv q8_0 -fa on --chunks 4 -ngl 99 2>&1 | grep "prompt eval" | grep -oE '[0-9.]+ tokens per second' | grep -oE '[0-9.]+')
+TURBO_TPS=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 4096 -ctk turbo3 -ctv turbo3 -fa on --chunks 4 -ngl 99 2>&1 | grep "prompt eval" | grep -oE '[0-9.]+ tokens per second' | grep -oE '[0-9.]+' || true)
+Q8_TPS=$($LLAMA/llama-perplexity -m $MODEL -f $WIKI -c 4096 -ctk q8_0 -ctv q8_0 -fa on --chunks 4 -ngl 99 2>&1 | grep "prompt eval" | grep -oE '[0-9.]+ tokens per second' | grep -oE '[0-9.]+' || true)
 
 if [ -z "$TURBO_TPS" ] || [ -z "$Q8_TPS" ]; then
     echo "  FAIL: Could not measure speed (crash or timeout)"

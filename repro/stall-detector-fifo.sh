@@ -21,17 +21,17 @@ while true; do
     [ "$now" -lt "$rearm_at" ] && continue
     tail_line=$(tail -1 "$LOG" 2>/dev/null | cut -c1-160)
     case "$tail_line" in
-        *n_decoded*|*prompt*|*eval*)
-            echo "[$(date -Is)] STALL on instrumented server; last: $tail_line" >> "$OUT"
-            {
-                echo "interrupt" > "$FIFO" 2>/dev/null
-                sleep 2
-                echo "info cuda kernels" > "$FIFO" 2>/dev/null
-                echo "info cuda contexts" > "$FIFO" 2>/dev/null
-                sleep 6
-                echo "continue" > "$FIFO" 2>/dev/null
-            } &
-            rearm_at=$((now + COOLDOWN))
-            ;;
+        *n_decoded*|*prompt*|*eval*) kind=instrumented ;;
+        *)                           kind=unrecognized ;;
     esac
+    echo "[$(date -Is)] STALL ($kind tail); last: $tail_line" >> "$OUT"
+    {
+        timeout 5 bash -c "echo interrupt > '$FIFO'" 2>/dev/null
+        sleep 2
+        timeout 5 bash -c "echo 'info cuda kernels' > '$FIFO'" 2>/dev/null
+        timeout 5 bash -c "echo 'info cuda contexts' > '$FIFO'" 2>/dev/null
+        sleep 6
+        timeout 5 bash -c "echo continue > '$FIFO'" 2>/dev/null
+    } &
+    rearm_at=$((now + COOLDOWN))
 done

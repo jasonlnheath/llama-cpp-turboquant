@@ -27,8 +27,8 @@ EOF
 }
 
 mktail() { python3 - "$1" <<'EOF'
-import random, sys
-random.seed(70000 + int(sys.argv[1]))
+import random, sys, zlib
+random.seed(70000 + zlib.crc32(sys.argv[1].encode()))
 words = [f"w{i:03d}" for i in range(800)]
 print(" ".join(random.choice(words) for _ in range(2500)))
 EOF

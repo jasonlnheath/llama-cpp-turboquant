@@ -154,11 +154,12 @@ def main():
                 freq[e] += 1
     ranked = sorted(freq.values(), reverse=True)
     tot = sum(ranked)
-    for frac in (0.1, 0.25, 0.5):
-        k = max(1, int(len(ranked) * frac))
-        print(f"top {frac:>4.0%} of (layer,expert) pairs carry "
-              f"{sum(ranked[:k]) / tot:.1%} of decode routing")
-    print()
+    if ranked:
+        for frac in (0.1, 0.25, 0.5):
+            k = max(1, int(len(ranked) * frac))
+            print(f"top {frac:>4.0%} of (layer,expert) pairs carry "
+                  f"{sum(ranked[:k]) / tot:.1%} of decode routing")
+        print()
 
     # cost model: expert slab MB, RAM GB/s (CPU miss read), PCIe GB/s (upload)
     SLAB_MB, RAM_GBS, PCIE_GBS = args.slab_mb, 45.0, 12.4

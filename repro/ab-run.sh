@@ -22,11 +22,18 @@ if [ -n "$pid" ]; then kill -TERM "$pid" 2>/dev/null; for i in $(seq 1 60); do k
 sleep 2
 
 echo "[$(date -Is)] AB $LABEL start (env: ${AB_ENV:-none}, extra: $*, bin: $BIN)" >> "$SUM"
+# distinguish a dead Xid watcher from a clean leg before trusting xid_count
+JOURNAL_OK=yes
+journalctl -k -n 1 --no-pager >/dev/null 2>&1 || JOURNAL_OK=no
+[ "$JOURNAL_OK" = yes ] || echo "[$(date -Is)] AB $LABEL WARNING: journalctl unreadable - xid_count for this leg is unreliable" >> "$SUM"
 # clock-state evidence: which profile this leg ran under (attribution per plan v2)
 nvidia-smi -q -d CLOCK >> "$SRVLOG" 2>&1 || true
 nvidia-smi --query-gpu=clocks.max.mem,clocks.max.sm,power.limit --format=csv >> "$SRVLOG" 2>&1 || true
 SPECARGS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-ngl 999"
-for a in "$@"; do [ "$a" = "NOSPEC" ] && SPECARGS=""; done
+ARGS=()
+for a in "$@"; do
+    if [ "$a" = "NOSPEC" ]; then SPECARGS=""; else ARGS+=("$a"); fi
+done
 
 # shellcheck disable=SC2086
 setsid env ${AB_ENV:-} "$BIN" \
@@ -36,7 +43,7 @@ setsid env ${AB_ENV:-} "$BIN" \
   -b 2048 -ub 512 $SPECARGS \
   --jinja --slots --metrics --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 \
   --repeat-penalty 1.05 --n-predict 24576 --reasoning-budget 12288 \
-  "$@" >> "$SRVLOG" 2>&1 &
+  "${ARGS[@]}" >> "$SRVLOG" 2>&1 &
 SRVPID=$!
 
 # wait for readiness
@@ -62,5 +69,5 @@ while [ "$(date +%s)" -lt "$end" ]; do
 done
 kill -- -"$DRVPID" 2>/dev/null; kill "$DRVPID" 2>/dev/null   # group kill: v4 workers are subshells
 n_xid=$(journalctl -k --since "-$((MINS+2)) min" --no-pager 2>/dev/null | grep -c Xid)
-echo "[$(date -Is)] AB $LABEL RESULT: survived ${MINS}min (xid_count=$n_xid)" >> "$SUM"
+echo "[$(date -Is)] AB $LABEL RESULT: survived ${MINS}min (xid_count=$n_xid, journalctl=$JOURNAL_OK)" >> "$SUM"
 exit 0

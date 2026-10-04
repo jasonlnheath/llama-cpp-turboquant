@@ -165,13 +165,20 @@ static enum ggml_status mock_backend_graph_compute(ggml_backend_t backend, struc
     return m->compute_status;
 }
 
-// ---- mock assembly (static storage; process-lifetime test objects) ----
+// ---- mock assembly ----
 
 struct mock {
     mock_state                  state;
     ggml_backend_buffer_type_t  buft;
     ggml_backend_dev_t          dev;
     ggml_backend_t              backend;
+
+    // the scheduler does not free caller-owned backends
+    ~mock() {
+        delete backend;
+        delete dev;
+        delete buft;
+    }
 };
 
 static std::unique_ptr<mock> make_mock(const char * name, enum ggml_backend_dev_type type,

@@ -54,7 +54,7 @@ static bool trace_cb(struct ggml_tensor * t, bool ask, void * user_data) {
 
     for (int j = 0; j < n_tokens; j++) {
         // prefill batches carry n_tokens > 1; decode steps carry 1
-        const int pos = tc->in_prompt ? -(tc->pos + n_tokens - j) : tc->pos;
+        const int pos = tc->in_prompt ? -(tc->pos + j + 1) : tc->pos;
         fprintf(tc->out, "%d,%d", pos, layer);
         for (int i = 0; i < n_used; i++) {
             const int32_t id = *(const int32_t *)(base + j*t->nb[1] + i*t->nb[0]);
