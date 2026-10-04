@@ -45,7 +45,7 @@ static bool trace_cb(struct ggml_tensor * t, bool ask, void * user_data) {
     const int n_tokens = (int) t->ne[1];
 
     // topk is a non-contiguous view over the argsort rows: copy the full
-    // strided byte range, then index by nb[] — sizing by n_used*n_tokens
+    // strided byte range, then index by nb[] - sizing by n_used*n_tokens
     // would under-allocate and tensor_get would smash the heap.
     const size_t nbytes = ggml_nbytes(t);
     tc->buf.resize((nbytes + sizeof(int32_t) - 1) / sizeof(int32_t));
@@ -73,7 +73,7 @@ int main(int argc, char ** argv) {
     if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_PERPLEXITY)) {
         return 1;
     }
-    // output path via env — the arg registry has no free slot for this example
+    // output path via env - the arg registry has no free slot for this example
     const char * out_path = getenv("MOE_TRACE_OUT");
     if (!out_path) {
         out_path = "moe-trace.csv";

@@ -2,6 +2,8 @@
 
 The MoE expert cache accelerates decode for Mixture-of-Experts (MoE) models when routed expert weights remain in host (CPU) memory. A cache hit runs the selected expert matvec on the GPU while the CPU computes the miss rows through the normal `MUL_MAT_ID` kernel. Exact gate/up/SwiGLU subgraphs can fuse rows resident in both weight tensors while half-resident and missing rows stay on the stock CPU path. The cache belongs to one backend scheduler and persists until that scheduler is destroyed.
 
+This document covers the demand-filled backend cache selected by `--moe-cache`. The similarly named `--moe-cache-profile` and `--moe-cache-slots` flags are a separate mechanism, not this cache: they build static GPU-resident hot expert packs at load time from a `llama-moe-trace` routing profile (see the flag help and `tools/moe-trace`).
+
 This is an opportunistic path. Unsupported nodes, unavailable cache capacity, contention, and cache failures fall back to CPU execution. The same provider interface is implemented by the CUDA, Metal, and Vulkan backends (HIP builds share the CUDA implementation); the detailed controls documented here are read by each backend when it creates its cache session.
 
 ## What is it for

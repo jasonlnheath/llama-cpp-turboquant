@@ -16,7 +16,7 @@ if pgrep -f 'cuda-gdb-python|cuda-gdb-minimal|bin/cuda-gdb' >/dev/null 2>&1 && [
     timeout 5 bash -c "echo kill > '$FIFO'" 2>/dev/null
     sleep 2
     timeout 5 bash -c "echo quit > '$FIFO'" 2>/dev/null
-    for i in $(seq 1 30); do
+    for _ in $(seq 1 30); do
         pgrep -f 'cuda-gdb-python|cuda-gdb-minimal|bin/cuda-gdb' >/dev/null 2>&1 || break
         sleep 1
     done
@@ -25,7 +25,7 @@ fi
 pid=$(listener_pid)
 if [ -n "$pid" ]; then
     kill -TERM "$pid" 2>/dev/null
-    for i in $(seq 1 90); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+    for _ in $(seq 1 90); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
 fi
 pkill -f 'stall-detector' 2>/dev/null
 pkill -f 'xid-watch' 2>/dev/null
@@ -33,5 +33,5 @@ pkill -f 'run-instrumented' 2>/dev/null
 sleep 2
 setsid nohup /home/jason/Work/qwen38-8037.sh </dev/null >/dev/null 2>&1 &
 sleep 1
-for i in $(seq 1 120); do pid=$(listener_pid); [ -n "$pid" ] && break; sleep 1; done
+for _ in $(seq 1 120); do pid=$(listener_pid); [ -n "$pid" ] && break; sleep 1; done
 echo "restored: ${pid:-not listening on $PORT yet}"

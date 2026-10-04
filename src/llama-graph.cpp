@@ -2064,7 +2064,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
 
     // MoE expert cache: split routed ids into hot-pack ids and cold ids.
     // scope: plain fused-SILU gated FFN (no clamp, no expert biases/scales,
-    // no pre-FFN weighting) — the dual chains below reproduce exactly that
+    // no pre-FFN weighting) - the dual chains below reproduce exactly that
     ggml_tensor * ids_hot  = nullptr;
     ggml_tensor * ids_cold = nullptr;
     const bool use_moe_packs = moe_cache && moe_cache->moe_map_hot && !gate_up_exps &&
@@ -2229,7 +2229,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
                     if (il >= 0) {
                         const float limit = hparams.swiglu_clamp_exp[il];
                         constexpr float eps = 1e-6f;
-                        // default zero-filled — only archs loading clamp metadata
+                        // default zero-filled - only archs loading clamp metadata
                         // (Step35, DSv4) get non-zero.
                         if (limit > eps) {
                             up = ggml_clamp(ctx0, up, -limit, limit);

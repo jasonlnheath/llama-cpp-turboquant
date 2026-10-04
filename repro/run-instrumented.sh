@@ -17,7 +17,7 @@ pid=$(ss -tlnp "sport = :$PORT" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p
 if [ -n "$pid" ]; then
     echo "[$(date -Is)] stopping systemd instance pid $pid" >&2
     kill -TERM "$pid" 2>/dev/null
-    for i in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+    for _ in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
 fi
 sleep 2
 

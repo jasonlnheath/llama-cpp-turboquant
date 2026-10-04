@@ -18,7 +18,7 @@ SUM="$HOME/logs/ab-summary.log"
 
 # stop whatever server is running on 8037 (systemd instance or previous ab instance)
 pid=$(ss -tlnp 'sport = :8037' 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | head -1)
-if [ -n "$pid" ]; then kill -TERM "$pid" 2>/dev/null; for i in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done; fi
+if [ -n "$pid" ]; then kill -TERM "$pid" 2>/dev/null; for _ in $(seq 1 60); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done; fi
 sleep 2
 
 echo "[$(date -Is)] AB $LABEL start (env: ${AB_ENV:-none}, extra: $*, bin: $BIN)" >> "$SUM"
@@ -47,7 +47,7 @@ setsid env ${AB_ENV:-} "$BIN" \
 SRVPID=$!
 
 # wait for readiness
-for i in $(seq 1 180); do
+for _ in $(seq 1 180); do
     curl -s -m 2 "http://127.0.0.1:8037/health" 2>/dev/null | grep -q ok && break
     kill -0 "$SRVPID" 2>/dev/null || { echo "[$(date -Is)] AB $LABEL server died during startup" >> "$SUM"; exit 1; }
     sleep 1
