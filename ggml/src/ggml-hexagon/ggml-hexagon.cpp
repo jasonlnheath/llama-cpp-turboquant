@@ -4089,7 +4089,8 @@ static bool ggml_backend_hexagon_device_supports_op(ggml_backend_dev_t dev, cons
             break;
 
         case GGML_OP_MUL_MAT_ID:
-            supp = ggml_hexagon_supported_mul_mat_id(sess, op);
+            // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+            supp = op->op_params[0] == 0 && ggml_hexagon_supported_mul_mat_id(sess, op);
             break;
 
         case GGML_OP_ADD_ID:

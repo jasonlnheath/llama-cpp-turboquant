@@ -1075,6 +1075,10 @@ static bool is_op_unsupported_case(const ggml_tensor * op) {
         break;
     }
     case GGML_OP_MUL_MAT_ID: {
+        if (op->op_params[0] != 0) {
+            // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+            return true;
+        }
         if (strncmp(op->name, "ffn_moe_gate_up", sizeof("ffn_moe_gate_up") - 1) == 0 ||
             strncmp(op->name, "ffn_moe_down", sizeof("ffn_moe_down") - 1) == 0) {
             return true;

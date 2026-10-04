@@ -18202,6 +18202,11 @@ static bool ggml_backend_vk_device_supports_op(ggml_backend_dev_t dev, const ggm
             {
                 ggml_type src0_type = op->src[0]->type;
                 if (op->op == GGML_OP_MUL_MAT_ID) {
+                    // op_params[0] != 0 announces ids that may contain -1 (expert not
+                    // owned by this pack); those have no zero-row semantics here
+                    if (op->op_params[0] != 0) {
+                        return false;
+                    }
                     // The TurboQuant weight types now have mul_mat_vec_id pipelines, so MoE
                     // decode runs on the GPU. Prompt processing does not: there is still no TQ
                     // mul_mm_id, so ggml_vk_get_mul_mat_mat_id_pipeline() returns nullptr,

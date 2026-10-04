@@ -9198,8 +9198,9 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     test_cases.emplace_back(new test_mul_mat(GGML_TYPE_Q8_0, GGML_TYPE_F32, 8192, 512, 5120, {128, 1}, {1, 1}));
 #endif
     // hot/cold expert-pack split: ids may be -1 ("expert not owned by this pack") and the
-    // op must emit zero rows for those slots — cover mmvq (n=1), mmq (n=64), mmf (f16) and
-    // the general fallback across quantized/float types
+    // op must emit zero rows for those slots - single-token decode, small multi-token
+    // batches and large batches across quantized/float types; backends without -1
+    // semantics reject the op in supports_op
     for (ggml_type ta : {GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_F32}) {
         test_cases.emplace_back(new test_mul_mat_id(ta, GGML_TYPE_F32, 16, 8, false, 256, 1, 256, /*skip_ids=*/true));
         test_cases.emplace_back(new test_mul_mat_id(ta, GGML_TYPE_F32, 16, 8, false, 256, 4, 256, /*skip_ids=*/true));

@@ -5729,6 +5729,11 @@ static bool do_ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, cons
         case GGML_OP_MUL_MAT:
         case GGML_OP_MUL_MAT_ID:
             {
+                if (op->op == GGML_OP_MUL_MAT_ID && op->op_params[0] != 0) {
+                    // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+                    return false;
+                }
+
                 struct ggml_tensor * a = op->src[0];
                 struct ggml_tensor * b = op->src[1];
 
