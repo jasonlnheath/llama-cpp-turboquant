@@ -930,7 +930,7 @@ struct ggml_backend_sched_split {
     struct ggml_cgraph graph;
 };
 
-// async execution of CPU splits (GGML_SCHED_ASYNC_CPU): a persistent worker
+// async execution of CPU splits (ggml_backend_sched_set_async_cpu): a persistent worker
 // computes a CPU split while the main thread keeps launching later splits that
 // do not depend on it, so an independent GPU split overlaps the CPU compute
 struct ggml_sched_cpu_async {
@@ -1067,7 +1067,7 @@ struct ggml_backend_sched {
     bool prefetch_used[GGML_SCHED_MAX_PREFETCH_SLOTS];
     int prefetch_cur;
 
-    // async CPU split execution (GGML_SCHED_ASYNC_CPU); NULL when disabled
+    // async CPU split execution (ggml_backend_sched_set_async_cpu); NULL when disabled
     struct ggml_sched_cpu_async * cpu_async;
 
     int debug;

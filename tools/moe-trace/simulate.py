@@ -18,8 +18,6 @@ Usage: simulate.py trace.csv [--budgets 0.125,0.25,0.5] [--reelect 32]
 """
 import argparse
 import csv
-import math
-import sys
 from collections import defaultdict
 
 
@@ -56,7 +54,7 @@ def top_by_freq(steps_by_layer, S):
         for ids in steps:
             for e in ids:
                 freq[e] += 1
-        resident[layer] = set(sorted(freq, key=freq.get, reverse=True)[:S])
+        resident[layer] = set(sorted(freq, key=freq.__getitem__, reverse=True)[:S])
     return resident
 
 
@@ -73,7 +71,7 @@ def sim_lru(decode, S):
                     hits += 1
                 else:
                     if len(cache) >= S:
-                        cache.pop(min(cache, key=cache.get))
+                        cache.pop(min(cache, key=cache.__getitem__))
                     ins += 1
                 cache[e] = clock
                 total += 1
@@ -116,7 +114,7 @@ def sim_reelect(decode, prefill, S, K, alpha=0.98):
         for ids in prefill.get(layer, []):        # free warm-up from prompt routing
             for e in ids:
                 score[e] += 1.0
-        cache = set(sorted(score, key=score.get, reverse=True)[:S])
+        cache = set(sorted(score, key=score.__getitem__, reverse=True)[:S])
         for step, ids in enumerate(steps):
             for e in ids:
                 hits += e in cache
@@ -125,7 +123,7 @@ def sim_reelect(decode, prefill, S, K, alpha=0.98):
             if step % K == K - 1:
                 for k in score:
                     score[k] *= alpha
-                new = set(sorted(score, key=score.get, reverse=True)[:S])
+                new = set(sorted(score, key=score.__getitem__, reverse=True)[:S])
                 ins += len(new - cache)
                 cache = new
     return hits / max(total, 1), ins / max(n_steps, 1)
@@ -159,7 +157,7 @@ def main():
     for frac in (0.1, 0.25, 0.5):
         k = max(1, int(len(ranked) * frac))
         print(f"top {frac:>4.0%} of (layer,expert) pairs carry "
-              f"{sum(ranked[:k])/tot:.1%} of decode routing")
+              f"{sum(ranked[:k]) / tot:.1%} of decode routing")
     print()
 
     # cost model: expert slab MB, RAM GB/s (CPU miss read), PCIe GB/s (upload)
@@ -188,7 +186,7 @@ def main():
         rows.append((f"reelect-{args.reelect}", h, i))
         for name, h, i in rows:
             miss_ms, up_ms = cost_ms(h, i)
-            print(f"{frac:>7.4f} {S:>6} | {name:>10} {h:>7.1%} {i*SLAB_MB:>9.2f} "
+            print(f"{frac:>7.4f} {S:>6} | {name:>10} {h:>7.1%} {i * SLAB_MB:>9.2f} "
                   f"{miss_ms:>8.2f} {up_ms:>6.2f}")
         print()
 
