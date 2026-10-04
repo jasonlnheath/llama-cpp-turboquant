@@ -190,7 +190,7 @@ static void ggml_cuda_flash_attn_ext_mma_turbo_switch_ncols2(ggml_backend_cuda_c
 static bool ggml_cuda_turbo_mma_fused() {
     static const bool v = []{
         const char * s = getenv("GGML_TURBO_MMA_FUSED");
-        return !(s && s[0] == '0');  // default ON (faster GQA-packed MMA, quality-neutral); GGML_TURBO_MMA_FUSED=0 = VEC kill-switch
+        return s && s[0] == '1';  // opt-in; VEC is the default (see comment above)
     }();
     return v;
 }
@@ -800,12 +800,12 @@ size_t ggml_cuda_flash_attn_ext_get_alloc_size(int device, const ggml_tensor * d
 void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     ggml_cuda_set_device(ctx.device);
 
-    // Fused turbo MMA decode gate (DEFAULT ON — see ggml_cuda_turbo_mma_fused; GGML_TURBO_MMA_FUSED=0 disables).
+    // Fused turbo MMA decode gate (opt-in via GGML_TURBO_MMA_FUSED=1 — see ggml_cuda_turbo_mma_fused).
     // Routes turbo4-K==turbo4-V, D in {128,256}, decode (Q->ne[1] <= 4) onto the GQA-packed
     // MMA path (KV read once per head-group instead of per query head). Q is ALREADY
     // graph-rotated (src/llama-graph.cpp) and the FA output is inverse-rotated there — this
-    // path does NO inline FWHT and NO src swap. Default OFF (env unset / !=1) falls straight
-    // GGML_TURBO_MMA_FUSED=0 falls straight through to the original VEC dispatch (kill-switch).
+    // path does NO inline FWHT and NO src swap. With the env unset (or != 1) execution
+    // falls straight through to the original VEC dispatch.
     {
         const ggml_tensor * Q = dst->src[0];
         const ggml_tensor * K = dst->src[1];

@@ -145,9 +145,12 @@ static void launch_mm_ids_helper(
 // entirely, so without this the corresponding dst rows would contain garbage. With zeros
 // the outputs of multiple expert packs can be merged additively.
 static __global__ void mm_ids_zero_skipped_rows(
-        const int32_t * __restrict__ ids, float * __restrict__ dst, const int64_t ne0,
+        const int32_t * ids_ptr, float * dst_ptr, const int64_t ne0,
         const int n_tokens, const int si1, const int64_t s_slot, const int64_t s_token) {
+    const int32_t * GGML_CUDA_RESTRICT ids = ids_ptr;
+    float         * GGML_CUDA_RESTRICT dst = dst_ptr;
     const int iex = blockIdx.y;
+    ggml_cuda_pdl_sync();
     for (int it = blockIdx.z; it < n_tokens; it += gridDim.z) {
         if (ids[it*si1 + iex] >= 0) {
             continue;
@@ -157,6 +160,7 @@ static __global__ void mm_ids_zero_skipped_rows(
             dst_row[i] = 0.0f;
         }
     }
+    ggml_cuda_pdl_lc();
 }
 
 void ggml_cuda_launch_mm_ids_zero_skipped_rows(
@@ -166,7 +170,8 @@ void ggml_cuda_launch_mm_ids_zero_skipped_rows(
     const int blocks_x = (ne0 + block_size - 1) / block_size;
     const dim3 num_blocks(blocks_x, n_expert_used, n_tokens < 65535 ? n_tokens : 65535);
     const dim3 block_dims(block_size, 1, 1);
-    mm_ids_zero_skipped_rows<<<num_blocks, block_dims, 0, stream>>>(ids, dst, ne0, n_tokens, si1, s_slot, s_token);
+    const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(num_blocks, block_dims, 0, stream);
+    ggml_cuda_kernel_launch(mm_ids_zero_skipped_rows, launch_params, ids, dst, ne0, n_tokens, si1, s_slot, s_token);
 }
 
 void ggml_cuda_launch_mm_ids_helper(

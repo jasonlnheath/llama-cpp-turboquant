@@ -237,9 +237,9 @@ static void set_rows_cuda(
 template <typename idx_t, int GROUP_SIZE>
 __launch_bounds__(128)  // max of 128 or 64
 static __global__ void k_set_rows_turbo3(
-        const float * __restrict__ src0,
-        const idx_t * __restrict__ src1,
-        block_turbo3_0 * __restrict__ dst,
+        const float * src0_ptr,
+        const idx_t * src1_ptr,
+        block_turbo3_0 * dst_ptr,
         const int64_t ne00,
         const int64_t ne01,
         const int64_t ne10,
@@ -257,6 +257,10 @@ static __global__ void k_set_rows_turbo3(
         const int64_t s3) {
 
     static_assert(GROUP_SIZE == 128 || GROUP_SIZE == 64, "GROUP_SIZE must be 128 or 64");
+
+    const float       * GGML_CUDA_RESTRICT src0 = src0_ptr;
+    const idx_t       * GGML_CUDA_RESTRICT src1 = src1_ptr;
+    block_turbo3_0    * GGML_CUDA_RESTRICT dst  = dst_ptr;
 
     // blockIdx.x = flat group index; threadIdx.x = element within group (0..GROUP_SIZE-1)
     const int j = threadIdx.x;
@@ -276,7 +280,9 @@ static __global__ void k_set_rows_turbo3(
     const int64_t i11 = i01 % ne11;
     const int64_t i10 = i01;
 
+    ggml_cuda_pdl_sync();
     const int64_t dst_row = *(src1 + i10*s10 + i11*s11 + i12*s12);
+    ggml_cuda_pdl_lc();
     const float * src_row = src0 + i01*s01 + i02*s02 + i03*s03;
     block_turbo3_0 * dst_row_ptr = (block_turbo3_0 *)((char *)dst + dst_row*s1 + i02*s2 + i03*s3);
     block_turbo3_0 * blk_base    = dst_row_ptr + i_grp * blocks_per_group;
@@ -421,9 +427,9 @@ static __global__ void k_set_rows_turbo3(
 
 template <typename idx_t>
 static __global__ void k_set_rows_turbo3_tail(
-        const float * __restrict__ src0,
-        const idx_t * __restrict__ src1,
-        block_turbo3_0 * __restrict__ dst,
+        const float * src0_ptr,
+        const idx_t * src1_ptr,
+        block_turbo3_0 * dst_ptr,
         const int64_t ne00,
         const int64_t ne01,
         const int64_t ne10,
@@ -441,6 +447,10 @@ static __global__ void k_set_rows_turbo3_tail(
         const int64_t s3,
         const int tail_size) {
 
+    const float       * GGML_CUDA_RESTRICT src0 = src0_ptr;
+    const idx_t       * GGML_CUDA_RESTRICT src1 = src1_ptr;
+    block_turbo3_0    * GGML_CUDA_RESTRICT dst  = dst_ptr;
+
     const int j = threadIdx.x;  // 0 .. tail_size-1
 
     // Decode blockIdx.x → (i01, i02, i03)
@@ -453,7 +463,9 @@ static __global__ void k_set_rows_turbo3_tail(
     const int64_t i10 = i01;
     const int64_t i12 = i02;
 
+    ggml_cuda_pdl_sync();
     const int64_t dst_row = *(src1 + i10*s10 + i11*s11 + i12*s12);
+    ggml_cuda_pdl_lc();
     const float * src_row = src0 + i01*s01 + i02*s02 + i03*s03;
     block_turbo3_0 * dst_row_ptr = (block_turbo3_0 *)((char *)dst + dst_row*s1 + i02*s2 + i03*s3);
 
@@ -573,13 +585,15 @@ static void set_rows_cuda_turbo3(
     if (n_full_groups > 0) {
         const int64_t ne_total = n_full_groups * ne01 * ne02 * ne03;
         if (group_size == 128) {
-            k_set_rows_turbo3<idx_t, 128><<<(int)ne_total, 128, 0, stream>>>(
+            const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)ne_total, 128, 0, stream);
+            ggml_cuda_kernel_launch(k_set_rows_turbo3<idx_t, 128>, launch_params,
                 src0_d, src1_d, (block_turbo3_0 *)dst->data,
                 ne00, ne01, ne10, ne11, ne12, ne13,
                 s01, s02, s03, s10, s11, s12,
                 nb1, nb2, nb3);
         } else {
-            k_set_rows_turbo3<idx_t, 64><<<(int)ne_total, 64, 0, stream>>>(
+            const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)ne_total, 64, 0, stream);
+            ggml_cuda_kernel_launch(k_set_rows_turbo3<idx_t, 64>, launch_params,
                 src0_d, src1_d, (block_turbo3_0 *)dst->data,
                 ne00, ne01, ne10, ne11, ne12, ne13,
                 s01, s02, s03, s10, s11, s12,
@@ -592,7 +606,8 @@ static void set_rows_cuda_turbo3(
     if (tail_size > 0) {
         GGML_ASSERT(tail_size % QK_TURBO3 == 0);  // tail must be block-aligned
         const int64_t n_rows = ne01 * ne02 * ne03;
-        k_set_rows_turbo3_tail<idx_t><<<(int)n_rows, tail_size, 0, stream>>>(
+        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)n_rows, tail_size, 0, stream);
+        ggml_cuda_kernel_launch(k_set_rows_turbo3_tail<idx_t>, launch_params,
             src0_d, src1_d, (block_turbo3_0 *)dst->data,
             ne00, ne01, ne10, ne11, ne12, ne13,
             s01, s02, s03, s10, s11, s12,
@@ -607,9 +622,9 @@ static void set_rows_cuda_turbo3(
 template <typename idx_t, int GROUP_SIZE>
 __launch_bounds__(128)
 static __global__ void k_set_rows_turbo2(
-        const float * __restrict__ src0,
-        const idx_t * __restrict__ src1,
-        block_turbo2_0 * __restrict__ dst,
+        const float * src0_ptr,
+        const idx_t * src1_ptr,
+        block_turbo2_0 * dst_ptr,
         const int64_t ne00,
         const int64_t ne01,
         const int64_t ne10,
@@ -628,6 +643,10 @@ static __global__ void k_set_rows_turbo2(
 
     static_assert(GROUP_SIZE == 128 || GROUP_SIZE == 64, "GROUP_SIZE must be 128 or 64");
 
+    const float       * GGML_CUDA_RESTRICT src0 = src0_ptr;
+    const idx_t       * GGML_CUDA_RESTRICT src1 = src1_ptr;
+    block_turbo2_0    * GGML_CUDA_RESTRICT dst  = dst_ptr;
+
     const int j = threadIdx.x;
 
     constexpr int blocks_per_group = GROUP_SIZE / QK_TURBO2;
@@ -644,7 +663,9 @@ static __global__ void k_set_rows_turbo2(
     const int64_t i11 = i01 % ne11;
     const int64_t i10 = i01;
 
+    ggml_cuda_pdl_sync();
     const int64_t dst_row = *(src1 + i10*s10 + i11*s11 + i12*s12);
+    ggml_cuda_pdl_lc();
     const float * src_row = src0 + i01*s01 + i02*s02 + i03*s03;
     block_turbo2_0 * dst_row_ptr = (block_turbo2_0 *)((char *)dst + dst_row*s1 + i02*s2 + i03*s3);
     block_turbo2_0 * blk_base    = dst_row_ptr + i_grp * blocks_per_group;
@@ -773,9 +794,9 @@ static __global__ void k_set_rows_turbo2(
 
 template <typename idx_t>
 static __global__ void k_set_rows_turbo2_tail(
-        const float * __restrict__ src0,
-        const idx_t * __restrict__ src1,
-        block_turbo2_0 * __restrict__ dst,
+        const float * src0_ptr,
+        const idx_t * src1_ptr,
+        block_turbo2_0 * dst_ptr,
         const int64_t ne00,
         const int64_t ne01,
         const int64_t ne10,
@@ -793,6 +814,10 @@ static __global__ void k_set_rows_turbo2_tail(
         const int64_t s3,
         const int tail_size) {
 
+    const float       * GGML_CUDA_RESTRICT src0 = src0_ptr;
+    const idx_t       * GGML_CUDA_RESTRICT src1 = src1_ptr;
+    block_turbo2_0    * GGML_CUDA_RESTRICT dst  = dst_ptr;
+
     const int j = threadIdx.x;
 
     int64_t tmp = blockIdx.x;
@@ -804,7 +829,9 @@ static __global__ void k_set_rows_turbo2_tail(
     const int64_t i10 = i01;
     const int64_t i12 = i02;
 
+    ggml_cuda_pdl_sync();
     const int64_t dst_row = *(src1 + i10*s10 + i11*s11 + i12*s12);
+    ggml_cuda_pdl_lc();
     const float * src_row = src0 + i01*s01 + i02*s02 + i03*s03;
     block_turbo2_0 * dst_row_ptr = (block_turbo2_0 *)((char *)dst + dst_row*s1 + i02*s2 + i03*s3);
 
@@ -916,13 +943,15 @@ static void set_rows_cuda_turbo2(
     if (n_full_groups > 0) {
         const int64_t ne_total = n_full_groups * ne01 * ne02 * ne03;
         if (group_size == 128) {
-            k_set_rows_turbo2<idx_t, 128><<<(int)ne_total, 128, 0, stream>>>(
+            const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)ne_total, 128, 0, stream);
+            ggml_cuda_kernel_launch(k_set_rows_turbo2<idx_t, 128>, launch_params,
                 src0_d, src1_d, (block_turbo2_0 *)dst->data,
                 ne00, ne01, ne10, ne11, ne12, ne13,
                 s01, s02, s03, s10, s11, s12,
                 nb1, nb2, nb3);
         } else {
-            k_set_rows_turbo2<idx_t, 64><<<(int)ne_total, 64, 0, stream>>>(
+            const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)ne_total, 64, 0, stream);
+            ggml_cuda_kernel_launch(k_set_rows_turbo2<idx_t, 64>, launch_params,
                 src0_d, src1_d, (block_turbo2_0 *)dst->data,
                 ne00, ne01, ne10, ne11, ne12, ne13,
                 s01, s02, s03, s10, s11, s12,
@@ -933,7 +962,8 @@ static void set_rows_cuda_turbo2(
     if (tail_size > 0) {
         GGML_ASSERT(tail_size % QK_TURBO2 == 0);
         const int64_t n_rows = ne01 * ne02 * ne03;
-        k_set_rows_turbo2_tail<idx_t><<<(int)n_rows, tail_size, 0, stream>>>(
+        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)n_rows, tail_size, 0, stream);
+        ggml_cuda_kernel_launch(k_set_rows_turbo2_tail<idx_t>, launch_params,
             src0_d, src1_d, (block_turbo2_0 *)dst->data,
             ne00, ne01, ne10, ne11, ne12, ne13,
             s01, s02, s03, s10, s11, s12,
@@ -950,9 +980,9 @@ static void set_rows_cuda_turbo2(
 template <typename idx_t>
 __launch_bounds__(128)
 static __global__ void k_set_rows_turbo4(
-        const float * __restrict__ src0,
-        const idx_t * __restrict__ src1,
-        block_turbo4_0 * __restrict__ dst,
+        const float * src0_ptr,
+        const idx_t * src1_ptr,
+        block_turbo4_0 * dst_ptr,
         const int64_t ne00,
         const int64_t ne01,
         const int64_t ne10,
@@ -968,6 +998,10 @@ static __global__ void k_set_rows_turbo4(
         const int64_t s1,
         const int64_t s2,
         const int64_t s3) {
+
+    const float       * GGML_CUDA_RESTRICT src0 = src0_ptr;
+    const idx_t       * GGML_CUDA_RESTRICT src1 = src1_ptr;
+    block_turbo4_0    * GGML_CUDA_RESTRICT dst  = dst_ptr;
 
     // blockIdx.x = flat block index; threadIdx.x = element within block (0..127)
     const int j = threadIdx.x;
@@ -986,7 +1020,9 @@ static __global__ void k_set_rows_turbo4(
     const int64_t i11 = i01 % ne11;
     const int64_t i10 = i01;
 
+    ggml_cuda_pdl_sync();
     const int64_t dst_row = *(src1 + i10*s10 + i11*s11 + i12*s12);
+    ggml_cuda_pdl_lc();
     const float * src_row = src0 + i01*s01 + i02*s02 + i03*s03;
     block_turbo4_0 * dst_row_ptr = (block_turbo4_0 *)((char *)dst + dst_row*s1 + i02*s2 + i03*s3);
     block_turbo4_0 * blk = dst_row_ptr + i_blk;
@@ -1129,7 +1165,8 @@ static void set_rows_cuda_turbo4(
 
     if (n_blocks > 0) {
         const int64_t ne_total = n_blocks * ne01 * ne02 * ne03;
-        k_set_rows_turbo4<idx_t><<<(int)ne_total, 128, 0, stream>>>(
+        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params((int)ne_total, 128, 0, stream);
+        ggml_cuda_kernel_launch(k_set_rows_turbo4<idx_t>, launch_params,
             src0_d, src1_d, (block_turbo4_0 *)dst->data,
             ne00, ne01, ne10, ne11, ne12, ne13,
             s01, s02, s03, s10, s11, s12,
