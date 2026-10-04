@@ -8,7 +8,7 @@ FIFO=/tmp/cuda-gdb-in.fifo
 STALL_SEC="${STALL_SEC:-4}"
 COOLDOWN="${COOLDOWN:-90}"
 
-last_size=0; last_change=$(date +%s); armed=1
+last_size=0; last_change=$(date +%s); rearm_at=0
 echo "[$(date -Is)] fifo stall-detector armed (log=$LOG)" >> "$OUT"
 while true; do
     sleep 1
@@ -18,7 +18,7 @@ while true; do
         last_size=$size; last_change=$now; continue
     fi
     [ $((now - last_change)) -lt "$STALL_SEC" ] && continue
-    [ "$armed" -ne 1 ] && continue
+    [ "$now" -lt "$rearm_at" ] && continue
     tail_line=$(tail -1 "$LOG" 2>/dev/null | cut -c1-160)
     case "$tail_line" in
         *n_decoded*|*prompt*|*eval*)
@@ -31,8 +31,7 @@ while true; do
                 sleep 6
                 echo "continue" > "$FIFO" 2>/dev/null
             } &
-            armed=0
-            (sleep "$COOLDOWN"; armed=1) &
+            rearm_at=$((now + COOLDOWN))
             ;;
     esac
 done

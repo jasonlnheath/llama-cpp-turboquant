@@ -13,7 +13,7 @@ CGDB_OUT="${CGDB_OUT:-$HOME/logs/xid8-cgdb-server.log}"
 PORT="${PORT:-8037}"
 
 # 1. stop the systemd instance (clean SIGTERM -> exit 0 -> no restart)
-pid=$(pgrep -f 'llama-cpp-moecache/build/bin/llama-server' | head -1)
+pid=$(ss -tlnp "sport = :$PORT" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | head -1)
 if [ -n "$pid" ]; then
     echo "[$(date -Is)] stopping systemd instance pid $pid" >&2
     kill -TERM "$pid" 2>/dev/null
