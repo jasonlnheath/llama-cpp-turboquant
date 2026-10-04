@@ -233,7 +233,10 @@ int main() {
     GGML_ASSERT(sched);
     ggml_backend_sched_set_async_cpu(sched, true);
 
-    // graph: s1 = x + y on the CPU backend; s2 = s1 * w on the GPU backend
+    // graph: s1 = x + y on the CPU backend; s2 = w * w on the GPU backend.
+    // s2 must not depend on s1: a cross-backend input would make the pending
+    // CPU job join before the GPU failure (the must_join check in
+    // compute_splits) and mask the error-path drain this test guards
     ggml_init_params ip{};
     ip.mem_size = 16 * ggml_tensor_overhead() + ggml_graph_overhead();
     ip.no_alloc = true;
@@ -247,10 +250,12 @@ int main() {
     ggml_set_input(w);
 
     ggml_tensor * s1 = ggml_add(ctx.get(), x, y);
-    ggml_tensor * s2 = ggml_mul(ctx.get(), s1, w);
+    ggml_tensor * s2 = ggml_mul(ctx.get(), w, w);
+    ggml_set_output(s1);
     ggml_set_output(s2);
 
     ggml_cgraph * graph = ggml_new_graph(ctx.get());
+    ggml_build_forward_expand(graph, s1);
     ggml_build_forward_expand(graph, s2);
 
     // size the gallocr first; reserve ends with a reset that would drop the

@@ -770,8 +770,8 @@ struct llama_model_base : public llama_model {
     void load_vocab  (llama_model_loader & ml) override;
     bool load_tensors(llama_model_loader & ml) override;
 
-    // GGML_MOE_CACHE_PROFILE + GGML_MOE_CACHE_SLOTS: build GPU-resident hot
-    // expert packs for CPU-offloaded MoE layers (see llama_layer::*_exps_hot)
+    // --moe-cache-profile + --moe-cache-slots: build GPU-resident hot expert
+    // packs for CPU-offloaded MoE layers (see llama_layer::*_exps_hot)
     void init_moe_expert_cache();
 
     // model must define these

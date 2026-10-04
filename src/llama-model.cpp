@@ -1695,16 +1695,8 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
 }
 
 void llama_model_base::init_moe_expert_cache() {
-    // flags take precedence; env vars kept as a fallback
     const char * profile_path = params.moe_cache_profile;
-    int n_slots = params.moe_cache_slots;
-    if (profile_path == nullptr || profile_path[0] == '\0') {
-        profile_path = getenv("GGML_MOE_CACHE_PROFILE");
-    }
-    if (n_slots <= 0) {
-        const char * slots_env = getenv("GGML_MOE_CACHE_SLOTS");
-        n_slots = slots_env ? atoi(slots_env) : 0;
-    }
+    const int n_slots = params.moe_cache_slots;
     if (profile_path == nullptr || profile_path[0] == '\0' || n_slots <= 0) {
         return;
     }
@@ -1745,6 +1737,13 @@ void llama_model_base::init_moe_expert_cache() {
     }
     if (dev == nullptr || ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_GPU) {
         LLAMA_LOG_WARN("%s: no GPU device - expert cache disabled\n", __func__);
+        return;
+    }
+    // skipped expert ids (-1) are handled by the CPU backend and the CUDA
+    // source family only; other GPU backends would index garbage weights
+    const char * dev_name = ggml_backend_dev_name(dev);
+    if (strncmp(dev_name, "CUDA", 4) != 0 && strncmp(dev_name, "ROCm", 4) != 0 && strncmp(dev_name, "MUSA", 4) != 0) {
+        LLAMA_LOG_WARN("%s: device '%s' does not support skipped expert ids - expert cache disabled\n", __func__, dev_name);
         return;
     }
     ggml_backend_buffer_type_t buft = ggml_backend_dev_buffer_type(dev);

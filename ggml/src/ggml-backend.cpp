@@ -2117,8 +2117,13 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                     };
 
                     int id = 0;
-                    while (!ggml_bitset_get(used_ids.data(), id)) {
+                    while (id < n_expert && !ggml_bitset_get(used_ids.data(), id)) {
                         id++;
+                    }
+                    if (id == n_expert) {
+                        // every routed expert lives in the other pack: the skipped
+                        // (-1) rows read no weights, so there is nothing to copy
+                        continue;
                     }
                     int32_t first_id = id;
                     int32_t last_id = first_id;
