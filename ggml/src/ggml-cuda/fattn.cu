@@ -190,7 +190,7 @@ static void ggml_cuda_flash_attn_ext_mma_turbo_switch_ncols2(ggml_backend_cuda_c
 static bool ggml_cuda_turbo_mma_fused() {
     static const bool v = []{
         const char * s = getenv("GGML_TURBO_MMA_FUSED");
-        return s && s[0] == '1';  // opt-in; VEC is the default (see comment above)
+        return !(s && s[0] == '0');  // default ON (faster GQA-packed MMA, quality-neutral); GGML_TURBO_MMA_FUSED=0 = VEC kill-switch
     }();
     return v;
 }
@@ -608,19 +608,6 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
     }
 #endif // GGML_CUDA_FA_ALL_QUANTS
 
-    // turbo kernels are instantiated only for head dims that are multiples of 64
-    // (turbo4: multiples of 128, matching its block size).
-    {
-        auto turbo_geom_ok = [](ggml_type t, int64_t ne0) {
-            if (t == GGML_TYPE_TURBO2_0 || t == GGML_TYPE_TURBO3_0) return ne0 % 64 == 0;
-            if (t == GGML_TYPE_TURBO4_0) return ne0 % 128 == 0;
-            return true;
-        };
-        if (!turbo_geom_ok(K->type, K->ne[0]) || !turbo_geom_ok(V->type, V->ne[0])) {
-            return BEST_FATTN_KERNEL_NONE;
-        }
-    }
-
     if (!ggml_cuda_fattn_kv_type_supported(K->type) || !ggml_cuda_fattn_kv_type_supported(V->type)) {
         return BEST_FATTN_KERNEL_NONE;
     }
@@ -800,12 +787,12 @@ size_t ggml_cuda_flash_attn_ext_get_alloc_size(int device, const ggml_tensor * d
 void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     ggml_cuda_set_device(ctx.device);
 
-    // Fused turbo MMA decode gate (opt-in via GGML_TURBO_MMA_FUSED=1 — see ggml_cuda_turbo_mma_fused).
+    // Fused turbo MMA decode gate (DEFAULT ON — see ggml_cuda_turbo_mma_fused; GGML_TURBO_MMA_FUSED=0 disables).
     // Routes turbo4-K==turbo4-V, D in {128,256}, decode (Q->ne[1] <= 4) onto the GQA-packed
     // MMA path (KV read once per head-group instead of per query head). Q is ALREADY
     // graph-rotated (src/llama-graph.cpp) and the FA output is inverse-rotated there — this
-    // path does NO inline FWHT and NO src swap. With the env unset (or != 1) execution
-    // falls straight through to the original VEC dispatch.
+    // path does NO inline FWHT and NO src swap. Default OFF (env unset / !=1) falls straight
+    // GGML_TURBO_MMA_FUSED=0 falls straight through to the original VEC dispatch (kill-switch).
     {
         const ggml_tensor * Q = dst->src[0];
         const ggml_tensor * K = dst->src[1];
