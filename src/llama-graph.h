@@ -1107,7 +1107,6 @@ struct llm_graph_context {
              ggml_tensor * selected_experts_in = nullptr,
             const llama_layer * moe_cache = nullptr) const;
 
->>>>>>> ac743f81f (feat: MoE expert cache — keep hot routed experts resident in VRAM (#5))
     //
     // inputs
     //

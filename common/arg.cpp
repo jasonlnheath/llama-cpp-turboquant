@@ -2741,7 +2741,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.moe_cache_slots = value;
         }
     ).set_env("LLAMA_ARG_MOE_CACHE_SLOTS"));
->>>>>>> ac743f81f (feat: MoE expert cache — keep hot routed experts resident in VRAM (#5))
     GGML_ASSERT(params.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
     add_opt(common_arg(
         {"-ngl", "--gpu-layers", "--n-gpu-layers"}, "N",
