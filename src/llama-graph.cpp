@@ -2067,7 +2067,7 @@ ggml_tensor * llm_graph_context::build_moe_ffn(
     // no pre-FFN weighting) - the dual chains below reproduce exactly that
     ggml_tensor * ids_hot  = nullptr;
     ggml_tensor * ids_cold = nullptr;
-    const bool use_moe_packs = moe_cache && moe_cache->moe_map_hot && !gate_up_exps &&
+    const bool use_moe_packs = moe_cache && moe_cache->moe_map_hot && loras->empty() && !gate_up_exps &&
         !up_exps_s && !gate_exps_s && !down_exps_s &&
         type_op == LLM_FFN_SILU && gate_exps && !up_exps_b && !gate_exps_b && !weight_before_ffn &&
         (il < 0 || hparams.swiglu_clamp_exp[il] <= 1e-6f);

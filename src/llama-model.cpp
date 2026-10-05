@@ -1697,7 +1697,13 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
 void llama_model_base::init_moe_expert_cache() {
     const char * profile_path = params.moe_cache_profile;
     const int n_slots = params.moe_cache_slots;
-    if (profile_path == nullptr || profile_path[0] == '\0' || n_slots <= 0) {
+    const bool has_profile = profile_path != nullptr && profile_path[0] != '\0';
+    const bool has_slots  = n_slots > 0;
+    if (has_profile != has_slots) {
+        LLAMA_LOG_WARN("%s: --moe-cache-profile and --moe-cache-slots must both be set - expert cache disabled\n", __func__);
+        return;
+    }
+    if (!has_profile) {
         return;
     }
 

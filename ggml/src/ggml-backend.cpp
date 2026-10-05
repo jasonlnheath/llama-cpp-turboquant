@@ -1940,6 +1940,9 @@ static bool ggml_backend_sched_prefetch_init(ggml_backend_sched_t sched, ggml_ba
                 return false;
             }
         }
+    } else if (sched->prefetch_backend->device != split_backend->device) {
+        // the prefetch backend, slots, and events are bound to a single device
+        return false;
     }
 
     size = std::max(size, ggml_backend_sched_prefetch_max_size(sched));
