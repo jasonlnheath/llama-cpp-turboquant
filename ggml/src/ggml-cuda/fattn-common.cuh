@@ -1406,8 +1406,10 @@ void launch_fattn(
         hip_f16_alloc & operator=(const hip_f16_alloc &) = delete;
         ~hip_f16_alloc() {
             if (ptr) {
-                cudaStreamSynchronize(stream);
-                cudaFree(ptr);
+                // ignore errors: the buffer is released regardless (also avoids
+                // [-Werror,-Wunused-value] on HIP, where these return a nodiscard hipError_t)
+                (void) cudaStreamSynchronize(stream);
+                (void) cudaFree(ptr);
             }
         }
         void alloc(size_t nelements) {
