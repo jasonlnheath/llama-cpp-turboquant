@@ -1,6 +1,23 @@
-# Xid 8 debug session state - FINAL: 2026-10-04 04:15 EDT (all validation legs complete)
+# Xid 8 debug session state - CLOSED 2026-10-05 ~07:30Z (PR shipped, merge awaits captain)
 
-## Status: CAMPAIGN COMPLETE - requesting Profile-1 flip-back; no-mistakes/PR phase
+## FINAL DELIVERY: https://github.com/jasonlnheath/llama-cpp-turboquant/pull/2
+Pipeline run 01M444PEW9QFMAC8SQPRK6YMFR completed (outcome: passed-with-override) at head fd7a48806:
+all 9 steps green (review/test/document/lint/push/pr/ci). CI: every hosted leg GREEN except two
+DOCUMENTED PRE-EXISTING platform defects (both proven on base a5eef8209): (1) macos webgpu
+Dawn unaligned-OFFSET set_tensor defect (no narrow fix; needs byte-copy machinery; captain-
+deferred follow-up); (2) macos-latest-x64 ACCEL+CPU topology defect (reproduced on base; pure-CPU
+suite passes; dedicated fork follow-up). 19 donated-runner legs + Lint + build-cmake-pkg disabled
+repo-side per captain rulings 013/018. Fixes the pipeline landed beyond the original branch:
+slot-restore SIGSEGV (task null-deref, verified repro+fix), sycl build breaks (dead orphan + 12
+undeclared-identifier sites), hip nodiscard (19+11 casts) + gfx908 VGPR allowlist (37 kernels),
+wasm OpenMP flag (upstream precedent), moe-trace -Wcomment, fit.cpp 14 format sites, plus the
+async-CPU drain, worker session propagation, and repro-kit hardening from earlier rounds.
+
+## Captain rulings incorporated
+- 013: Profile 1 RETAINED FOR POWER ("13% power savings you are ignoring"): the 885mV UV is the
+  point; speed-neutral vs stock, stability-equal at sane clocks. Perf verdict stands as measured.
+- 018: platform legs triaged fix-vs-skip as executed above; merge = captain's word.
+
 
 ## FINAL RESULTS TABLE (zero Xid / zero NVRM across the entire ~5.2 GPU-hour campaign)
 | leg | build | clocks | load | duration | result |
