@@ -280,7 +280,7 @@ struct ggml_cuda_ar_host_mapping {
         }
         rc = cudaHostGetDevicePointer(reinterpret_cast<void **>(&dev), host, 0);
         if (rc != cudaSuccess) {
-            cudaFreeHost(host);
+            (void)cudaFreeHost(host);
             host = nullptr;
             dev  = nullptr;
         }
@@ -289,7 +289,7 @@ struct ggml_cuda_ar_host_mapping {
 
     void free() {
         if (host) {
-            cudaFreeHost(host);
+            (void)cudaFreeHost(host);
             host = nullptr;
             dev  = nullptr;
         }
@@ -543,7 +543,7 @@ void ggml_cuda_ar_pipeline_free(ggml_cuda_ar_pipeline * p) {
     for (int i = 0; i < p->n_devices; ++i) {
         if (p->streams[i]) {
             ggml_cuda_set_device(p->devices[i]);
-            cudaStreamSynchronize(p->streams[i]);
+            (void)cudaStreamSynchronize(p->streams[i]);
         }
     }
 
@@ -552,28 +552,28 @@ void ggml_cuda_ar_pipeline_free(ggml_cuda_ar_pipeline * p) {
         p->host_large[i].free();
         if (p->dev_tmp[i]) {
             ggml_cuda_set_device(p->devices[i]);
-            cudaFree(p->dev_tmp[i]);
+            (void)cudaFree(p->dev_tmp[i]);
         }
         ggml_cuda_set_device(p->devices[i]);
         for (int s = 0; s < GGML_CUDA_AR_POOL_SIZE; ++s) {
-            if (p->ev_pool[i][s].app) { cudaEventDestroy(p->ev_pool[i][s].app); }
+            if (p->ev_pool[i][s].app) { (void)cudaEventDestroy(p->ev_pool[i][s].app); }
             for (int c = 0; c < GGML_CUDA_AR_COPY_MAX_CHUNKS; ++c) {
-                if (p->ev_pool[i][s].cpy[c]) { cudaEventDestroy(p->ev_pool[i][s].cpy[c]); }
+                if (p->ev_pool[i][s].cpy[c]) { (void)cudaEventDestroy(p->ev_pool[i][s].cpy[c]); }
             }
-            if (p->ev_pool[i][s].h2d) { cudaEventDestroy(p->ev_pool[i][s].h2d); }
-            if (p->ev_pool[i][s].ker) { cudaEventDestroy(p->ev_pool[i][s].ker); }
+            if (p->ev_pool[i][s].h2d) { (void)cudaEventDestroy(p->ev_pool[i][s].h2d); }
+            if (p->ev_pool[i][s].ker) { (void)cudaEventDestroy(p->ev_pool[i][s].ker); }
         }
         if (p->host_large_read_done[i]) {
             ggml_cuda_set_device(p->devices[i]);
-            cudaEventDestroy(p->host_large_read_done[i]);
+            (void)cudaEventDestroy(p->host_large_read_done[i]);
         }
         if (p->dev_tmp_kernel_done[i]) {
             ggml_cuda_set_device(p->devices[i]);
-            cudaEventDestroy(p->dev_tmp_kernel_done[i]);
+            (void)cudaEventDestroy(p->dev_tmp_kernel_done[i]);
         }
         if (p->streams[i]) {
             ggml_cuda_set_device(p->devices[i]);
-            cudaStreamDestroy(p->streams[i]);
+            (void)cudaStreamDestroy(p->streams[i]);
         }
     }
     p->arrival.free();
