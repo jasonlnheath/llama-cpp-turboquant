@@ -29,6 +29,21 @@ re-triggered and failed byte-identically again.
 Disposition unchanged (platform skip, never a code change); final PR notes should cite
 these final-head run IDs.
 
+Update 2026-10-06, third occurrence at head b737d3db74 (push of the second disposition
+commit; delta vs 3e0d25c75 is this file's +12 lines, nothing build-relevant): both lanes
+re-triggered and failed byte-identically again (verified in live logs, pull_request
+events at head_sha b737d3db74).
+- macos "CI (webgpu)" arm64, run 37433956780 job 112171091489: same test-backend-ops #41
+  abort, ggml-webgpu.cpp:4090 "BufferOffset (4126) is not a multiple of 4" (Dawn
+  WriteBuffer tensor_buf43, offset 4126, 8 bytes) during the stock unary-ABS init
+  sequence; 98% tests passed, 1 failed of 51.
+- macos-latest-x64 "CI (apple)", run 37433956809 job 112171091213: same test-llama-archs
+  #26 abort, ops.cpp:5163 GGML_ASSERT(i1 >= 0 && i1 < ne1) on the llama4/Accelerate row,
+  preceded by llama/Accelerate Dense+MoE "OK (nan)" FAIL rows; 98% tests passed,
+  1 failed of 51.
+Disposition unchanged (platform skip, never a code change); final PR notes should cite
+these final-head run IDs.
+
 ## FINAL DELIVERY: https://github.com/jasonlnheath/llama-cpp-turboquant/pull/2
 Pipeline run 01M444PEW9QFMAC8SQPRK6YMFR completed (outcome: passed-with-override) at head fd7a48806:
 all 9 steps green (review/test/document/lint/push/pr/ci). CI: every hosted leg GREEN except two
