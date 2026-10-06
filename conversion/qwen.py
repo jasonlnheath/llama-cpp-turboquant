@@ -689,6 +689,7 @@ class DFlashModel(Qwen3Model):
             name = "model." + name
         return super().filter_tensors((name, gen))
 
+
 @ModelBase.register("Qwen3DSparkModel")
 class DSparkModel(DFlashModel):
     # DSpark = DFlash + a semi-autoregressive Markov head
@@ -707,4 +708,3 @@ class DSparkModel(DFlashModel):
         if name.endswith(("embed_tokens.weight", "lm_head.weight")):
             return None
         return super().filter_tensors((name, gen))
-
