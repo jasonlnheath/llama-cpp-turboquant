@@ -17,6 +17,18 @@ workflow file touched for either.
   two-backend garbage-compute defect, reproduced identically on base a5eef8209.
 Both must be listed in the final PR notes for PR #2.
 
+Update 2026-10-06, second occurrence at head 3e0d25c75 (push of the disposition-only
+commit; delta vs d707dd345 is this file's +17 lines, nothing build-relevant): both lanes
+re-triggered and failed byte-identically again.
+- macos "CI (webgpu)" arm64, run 37426625006 job 112147628468: same test-backend-ops #41
+  abort, ggml-webgpu.cpp:4090 "BufferOffset (4126) is not a multiple of 4" during stock
+  ABS(f16,[5,7,11,13],v=1) init.
+- macos-latest-x64 "CI (apple)", run 37426624977 job 112147628567: same test-llama-archs
+  #26 abort, ops.cpp:5163 GGML_ASSERT(i1 >= 0 && i1 < ne1) on the llama4/Accelerate row,
+  preceded by llama/Accelerate Dense+MoE "OK (nan)" FAIL rows (garbage-compute symptom).
+Disposition unchanged (platform skip, never a code change); final PR notes should cite
+these final-head run IDs.
+
 ## FINAL DELIVERY: https://github.com/jasonlnheath/llama-cpp-turboquant/pull/2
 Pipeline run 01M444PEW9QFMAC8SQPRK6YMFR completed (outcome: passed-with-override) at head fd7a48806:
 all 9 steps green (review/test/document/lint/push/pr/ci). CI: every hosted leg GREEN except two
