@@ -82,6 +82,7 @@ For the full list of features, please refer to [server's changelog](https://gith
 | `-ot, --override-tensor <tensor name pattern>=<buffer type>,...` | override tensor buffer type<br/>(env: LLAMA_ARG_OVERRIDE_TENSOR) |
 | `-cmoe, --cpu-moe` | keep all Mixture of Experts (MoE) weights in the CPU<br/>(env: LLAMA_ARG_CPU_MOE) |
 | `-ncmoe, --n-cpu-moe N` | keep the Mixture of Experts (MoE) weights of the first N layers in the CPU<br/>(env: LLAMA_ARG_N_CPU_MOE) |
+| `--moe-cache MODE` | adaptively cache the hottest CPU-resident MoE experts in spare VRAM (default: auto; auto = preserve weight repacking; on = automatic budget without weight repacking; soft = try spare VRAM first, evict experts only as needed; off/0 = disabled; N = VRAM budget in MiB per device without weight repacking)<br/>(env: LLAMA_ARG_MOE_CACHE) |
 | `--moe-cache-profile FNAME` | routing profile CSV (from llama-moe-trace) used to pick which experts to cache in GPU memory<br/>(env: LLAMA_ARG_MOE_CACHE_PROFILE) |
 | `--moe-cache-slots N` | number of routed experts per layer to keep resident in GPU memory (default: 0 = disabled)<br/>(env: LLAMA_ARG_MOE_CACHE_SLOTS) |
 | `-ngl, --gpu-layers, --n-gpu-layers N` | max. number of layers to store in VRAM, either an exact number, 'auto', or 'all' (default: auto)<br/>(env: LLAMA_ARG_N_GPU_LAYERS) |

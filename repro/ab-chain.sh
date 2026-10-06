@@ -2,7 +2,7 @@
 # Chain A/B experiments overnight-style: each variant runs N minutes under the
 # multi-client v4 driver; results appended to ~/logs/ab-summary.log.
 set -u
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit
 MINS="${1:-45}"
 
 echo "=== AB chain start $(date -Is), ${MINS}min each ===" >> ~/logs/ab-summary.log

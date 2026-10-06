@@ -65,7 +65,7 @@ test parameters:
   --poll <0...100>                          (default: 50)
   -ngl, --n-gpu-layers <n>                  (default: -1)
   -ncmoe, --n-cpu-moe <n>                   (default: 0)
-  --moe-cache <auto|on|off|0|MiB>           (default: auto)
+  --moe-cache <auto|on|soft|off|0|MiB>      (default: auto)
   --repack <auto|on|off>                    weight repacking policy (default: auto)
   -nr, --no-repack                          equivalent to --repack off
   -sm, --split-mode <none|layer|row|tensor> (default: layer)

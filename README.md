@@ -33,7 +33,7 @@ environment variables, and produce **token-identical** output to mainline.
 | Env var | What it does |
 | --- | --- |
 | `GGML_CUDA_REGISTER_HOST=1` | Page-locks (pins) the mmap'd CPU expert weights so host->device copies go straight over DMA instead of through the driver's hidden bounce buffer (~6-7 -> ~20 GB/s). |
-| `GGML_SCHED_PREFETCH_EXPERTS=1` | Prefetches each layer's experts on a second CUDA stream, so the weight uploads overlap compute instead of stalling the GPU. |
+| `GGML_SCHED_PREFETCH_EXPERTS=1` | Prefetches each layer's experts on a second CUDA stream, so the weight uploads overlap compute instead of stalling the GPU. The prefetch engine binds to a single device; expert uploads for splits on other GPUs use the regular copy path. |
 
 ### Benchmark
 
