@@ -1429,8 +1429,11 @@ bool ggml_metal_device_supports_op(ggml_metal_device_t dev, const struct ggml_te
             return op->src[0]->ne[0] % 128 == 0;
         case GGML_OP_SOLVE_TRI:
         case GGML_OP_MUL_MAT:
-        case GGML_OP_MUL_MAT_ID:
             return has_simdgroup_reduction && op->src[0]->type != GGML_TYPE_NVFP4;
+        case GGML_OP_MUL_MAT_ID:
+            // op_params[0] != 0 announces ids that may contain -1 (expert not owned
+            // by this pack); those have no zero-row semantics here
+            return op->op_params[0] == 0 && has_simdgroup_reduction && op->src[0]->type != GGML_TYPE_NVFP4;
         case GGML_OP_SET:
         case GGML_OP_CPY:
         case GGML_OP_DUP:

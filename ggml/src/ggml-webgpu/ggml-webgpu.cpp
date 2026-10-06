@@ -4358,6 +4358,10 @@ static bool ggml_backend_webgpu_device_supports_op(ggml_backend_dev_t dev, const
                 break;
             }
         case GGML_OP_MUL_MAT_ID:
+            if (op->op_params[0] != 0) {
+                // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+                break;
+            }
             switch (src1->type) {
                 case GGML_TYPE_F16:
                     supports_op |= (src0->type == GGML_TYPE_F16);

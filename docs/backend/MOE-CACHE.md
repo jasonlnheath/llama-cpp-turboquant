@@ -2,6 +2,8 @@
 
 The MoE expert cache accelerates decode for Mixture-of-Experts (MoE) models when routed expert weights remain in host (CPU) memory. A cache hit runs the selected expert matvec on the GPU while the CPU computes the miss rows through the normal `MUL_MAT_ID` kernel. Exact gate/up/SwiGLU subgraphs can fuse rows resident in both weight tensors while half-resident and missing rows stay on the stock CPU path. The cache belongs to one backend scheduler and persists until that scheduler is destroyed.
 
+This document covers the demand-filled backend cache selected by `--moe-cache`. The similarly named `--moe-cache-profile` and `--moe-cache-slots` flags are a separate mechanism, not this cache; see [Static hot expert packs](#static-hot-expert-packs).
+
 This is an opportunistic path. Unsupported nodes, unavailable cache capacity, contention, and cache failures fall back to CPU execution. The same provider interface is implemented by the CUDA, Metal, and Vulkan backends (HIP builds share the CUDA implementation); the detailed controls documented here are read by each backend when it creates its cache session.
 
 ## What is it for
@@ -115,6 +117,30 @@ By default:
 - Full pools use LRU eviction. After a successful fill, that expert needs eight fresh misses before it can replace another entry.
 
 The default maximum is eight tokens. Larger prompt-processing nodes bypass the cache, while single-token decode and current speculative verification batches remain eligible in `auto`, `on`, and fixed-budget modes.
+
+## Static hot expert packs
+
+`--moe-cache-profile FNAME` together with `--moe-cache-slots N` builds a separate mechanism from the demand-filled cache above: at load time, the `N` most-routed experts per layer - ranked by decode frequency in the profile - are copied into a GPU weights buffer. Each covered layer's FFN graph then runs as two unbroken chains: hot routing rows multiply against the GPU pack, cold rows against the CPU experts, and rows skipped with id `-1` contribute a zero row on the other side of the split, so one add merges the chains into the exact single-tensor result. Both flags are required; a profile without a positive slot count, or slots without a profile, logs a warning and leaves packs disabled. Construction and ranking live in `init_moe_expert_cache` (`src/llama-model.cpp`); the dual-chain graph lives in `build_moe_ffn` (`src/llama-graph.cpp`).
+
+Operative constraints. A failing load-time check logs a reason and leaves packs disabled; a per-layer graph condition falls back to the stock path without logging:
+
+- CUDA, ROCm, and MUSA devices only. Pack `MUL_MAT_ID` nodes announce that their ids may contain `-1`, and skipped-id zero rows are implemented by the CPU backend and the CUDA source family only; other GPU backends would index garbage weights, so packs are not built there.
+- Only layers whose routed expert weights are host-resident get packs (`--n-cpu-moe`, `--cpu-moe`, or explicit placement). Layers already GPU-resident have nothing to split.
+- Plain fused-SILU gated FFN layers only: no merged gate/up tensor, expert biases or scales, pre-FFN weighting, or SwiGLU clamp. Non-qualifying layers keep the stock path even when packs exist.
+- No LoRA adapters. The pack chains have no LoRA-aware expert matmul, so any attached adapter disables packs and the stock LoRA-aware path (`build_lora_mm_id`) runs instead.
+- The hot/cold CPU-GPU overlap engages for decode-size batches only: with async CPU splits (the default), batches of at most 8 tokens compute the cold chain on a CPU worker while the hot chain runs on the GPU. Larger batches are still correct but compute the two chains without that overlap.
+- The profile is a `llama-moe-trace` CSV (`pos,layer,id0,id1,...`). Only decode rows (non-negative `pos`) feed the ranking; prefill rows are tagged with negative positions and ignored.
+
+Capture routing, replay it offline to pick a slot count, then serve with packs:
+
+```sh
+MOE_TRACE_OUT=trace.csv ./build/bin/llama-moe-trace -m model.gguf -ngl 99 -ncmoe 26 -fa on -p "prompt text" -n 512
+python3 tools/moe-trace/simulate.py trace.csv
+./build/bin/llama-server -m model.gguf -ngl 99 -ncmoe 26 -fa on \
+    --moe-cache-profile trace.csv --moe-cache-slots 32
+```
+
+`MOE_TRACE_OUT` selects the trace output path (default `moe-trace.csv`). `simulate.py` replays the decode routing against several residency policies (`st-oracle`, `st-prefill`, `lru`, `lfu-decay`, `reelect-K`) and prints hit rates per cache budget; the loader implements the `st-oracle` ranking, so that column estimates the hit rate for a given slot count. The slot count is capped at each layer's expert count, and a successful build logs `expert cache: <layers> x <slots>, <MiB> uploaded`.
 
 ## DeepSeek V4 Flash and MXFP4
 

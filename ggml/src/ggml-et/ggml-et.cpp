@@ -1017,6 +1017,11 @@ static bool ggml_backend_et_device_supports_op(ggml_backend_dev_t dev, const ggm
             // src1 (b):  [K, n_expert_used, batch] - activations (F32)
             // src2 (ids): [n_expert_used, batch] - expert selection indices (I32)
             // dst: [M, n_expert_used, batch, 1] - output (F32)
+            if (op->op_params[0] != 0) {
+                // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+                supported = false;
+                break;
+            }
             if (op->type == GGML_TYPE_F32 && op->src[0] &&
                 (op->src[0]->type == GGML_TYPE_Q8_0 || op->src[0]->type == GGML_TYPE_Q4_0 ||
                  op->src[0]->type == GGML_TYPE_F16 || op->src[0]->type == GGML_TYPE_F32) &&

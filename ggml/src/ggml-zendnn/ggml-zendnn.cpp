@@ -702,6 +702,11 @@ static bool ggml_backend_zendnn_device_supports_op(ggml_backend_dev_t dev, const
         case GGML_OP_MUL_MAT:
         case GGML_OP_MUL_MAT_ID:
         {
+            if (op->op == GGML_OP_MUL_MAT_ID && op->op_params[0] != 0) {
+                // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+                return false;
+            }
+
             const ggml_tensor * weights = op->src[0];
             const ggml_tensor * inputs = op->src[1];
 

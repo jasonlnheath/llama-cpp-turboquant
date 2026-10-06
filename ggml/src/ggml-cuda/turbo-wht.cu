@@ -20,13 +20,17 @@
 // For inverse (V un-rotation): multiply AFTER WHT+signs.
 
 template <int direction, int group_size>
-static __global__ void k_turbo_wht_f32(const float * __restrict__ src,
-                                        float * __restrict__ dst,
-                                        const float * __restrict__ scale_inv,
+static __global__ void k_turbo_wht_f32(const float * src_ptr_v,
+                                        float * dst_ptr_v,
+                                        const float * scale_inv_ptr_v,
                                         int64_t n_groups,
                                         int64_t head_dim,
                                         int64_t groups_per_head) {
     static_assert(group_size == 128 || group_size == 64 || group_size == 32, "group_size must be 128, 64, or 32");
+
+    const float * GGML_CUDA_RESTRICT src       = src_ptr_v;
+    float       * GGML_CUDA_RESTRICT dst       = dst_ptr_v;
+    const float * GGML_CUDA_RESTRICT scale_inv = scale_inv_ptr_v;
 
     const int64_t g = blockIdx.x;
     if (g >= n_groups) return;
@@ -42,7 +46,9 @@ static __global__ void k_turbo_wht_f32(const float * __restrict__ src,
     __shared__ float x[group_size];
 
     // Load from global memory
+    ggml_cuda_pdl_sync();
     x[t] = src[base + t];
+    ggml_cuda_pdl_lc();
     __syncthreads();
 
     // InnerQ forward: apply scale_inv BEFORE signs+WHT (for Q pre-rotation)
@@ -105,19 +111,23 @@ static __global__ void k_turbo_wht_f32(const float * __restrict__ src,
 
 // ─── Simple copy kernel for tail elements (identity pass-through) ────────────
 
-static __global__ void k_turbo_wht_copy_tail(const float * __restrict__ src,
-                                              float * __restrict__ dst,
+static __global__ void k_turbo_wht_copy_tail(const float * src_ptr_v,
+                                              float * dst_ptr_v,
                                               int64_t n_heads,
                                               int64_t head_dim,
                                               int64_t tail_offset,
                                               int tail_size) {
+    const float * GGML_CUDA_RESTRICT src = src_ptr_v;
+    float       * GGML_CUDA_RESTRICT dst = dst_ptr_v;
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_heads * tail_size) return;
 
     const int64_t head_idx  = i / tail_size;
     const int64_t tail_elem = i % tail_size;
     const int64_t offset    = head_idx * head_dim + tail_offset + tail_elem;
+    ggml_cuda_pdl_sync();
     dst[offset] = src[offset];
+    ggml_cuda_pdl_lc();
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
@@ -152,27 +162,32 @@ void ggml_cuda_turbo_wht(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
 
     // Process full groups
     if (n_groups > 0) {
-        dim3 blocks(n_groups);
         if (group_size == 128) {
             dim3 threads(128);
             if (direction == 0) {
-                k_turbo_wht_f32<0, 128><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<0, 128>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             } else {
-                k_turbo_wht_f32<1, 128><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<1, 128>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             }
         } else if (group_size == 64) {
             dim3 threads(64);
             if (direction == 0) {
-                k_turbo_wht_f32<0, 64><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<0, 64>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             } else {
-                k_turbo_wht_f32<1, 64><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<1, 64>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             }
         } else {
             dim3 threads(32);
             if (direction == 0) {
-                k_turbo_wht_f32<0, 32><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<0, 32>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             } else {
-                k_turbo_wht_f32<1, 32><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
+                const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_groups, threads, 0, stream);
+                ggml_cuda_kernel_launch(k_turbo_wht_f32<1, 32>, launch_params, src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             }
         }
     }
@@ -183,7 +198,8 @@ void ggml_cuda_turbo_wht(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
         const int64_t total_tail = n_heads * tail_size;
         const int block_sz = 256;
         const int n_blocks = (int)((total_tail + block_sz - 1) / block_sz);
-        k_turbo_wht_copy_tail<<<n_blocks, block_sz, 0, stream>>>(
+        const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(n_blocks, block_sz, 0, stream);
+        ggml_cuda_kernel_launch(k_turbo_wht_copy_tail, launch_params,
             src_ptr, dst_ptr, n_heads, head_dim, groups_per_head * group_size, tail_size);
     }
 }

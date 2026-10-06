@@ -2455,6 +2455,10 @@ static bool ggml_backend_cann_supports_op(ggml_backend_dev_t dev, const ggml_ten
                 }
             }
         case GGML_OP_MUL_MAT_ID:
+            if (op->op_params[0] != 0) {
+                // ids may contain -1 (expert not owned by this pack); no zero-row semantics here
+                return false;
+            }
             switch (op->src[0]->type) {
                 case GGML_TYPE_F16:
                 case GGML_TYPE_F32:

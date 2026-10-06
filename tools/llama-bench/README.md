@@ -65,7 +65,7 @@ test parameters:
   --poll <0...100>                          (default: 50)
   -ngl, --n-gpu-layers <n>                  (default: -1)
   -ncmoe, --n-cpu-moe <n>                   (default: 0)
-  --moe-cache <auto|on|off|0|MiB>           (default: auto)
+  --moe-cache <auto|on|soft|off|0|MiB>      (default: auto)
   --repack <auto|on|off>                    weight repacking policy (default: auto)
   -nr, --no-repack                          equivalent to --repack off
   -sm, --split-mode <none|layer|row|tensor> (default: layer)
@@ -83,6 +83,7 @@ test parameters:
                                             (default: disabled)
   -nopo, --no-op-offload <0|1>              (default: 0)
   --no-host <0|1>                           (default: 0)
+  --sched-async-cpu <0|1>                   (default: 1)
 
 Multiple values can be given for each parameter by separating them with ','
 or by specifying the parameter multiple times. Ranges can be given as

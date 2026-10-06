@@ -30,6 +30,7 @@ Turbo cache types are runtime-only, never stored in GGUF. TQ3_1S/TQ4_1S are firs
 - `ggml/src/ggml-vulkan/` - turbo FA, SET_ROWS, dequant shaders
 - `ggml/src/ggml-metal/ggml-metal.metal` - TurboFlash kernels
 - `docs/KV-cache-quantization.md` - authoritative usage doc (read before touching cache types)
+- `docs/backend/MOE-CACHE.md` - authoritative usage doc (read before touching the MoE expert cache)
 
 ### Usage
 
