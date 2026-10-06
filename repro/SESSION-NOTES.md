@@ -1,5 +1,22 @@
 # Xid 8 debug session state - CLOSED 2026-10-05 ~07:30Z (PR shipped, merge awaits captain)
 
+## CI rerun disposition 2026-10-06 (Firstmate ruling 025) - macOS legs stay platform-skipped
+Post-push head d707dd345 (PR #2, base a5eef8209): both macOS checks were rerun once as a
+flake check and BOTH FAILED IDENTICALLY -> apply the documented pre-existing-on-base
+platform skip path (captain's standing ci-matrix-runner-gap resolution, option (a),
+extended to this class; prior passed-with-override precedent below). No source or
+workflow file touched for either.
+- macos "CI (webgpu)" arm64, run 37408468439 job 112091276343: test-backend-ops #41
+  subprocess abort; ggml-webgpu.cpp:4090 Device error "BufferOffset (4126) is not a
+  multiple of 4" in ggml_backend_webgpu_buffer_set_tensor during stock ABS(f16,
+  [5,7,11,13],v=1) init. Pre-existing ggml-webgpu unaligned-OFFSET defect, proven on
+  base a5eef8209; no narrow fix (needs byte-copy machinery); captain-deferred rounds 4d/6.
+- macos-latest-x64 "CI (apple)", run 37408468448 job 112091276544: test-llama-archs #26
+  subprocess abort; ggml-cpu/ops.cpp:5163 GGML_ASSERT(i1 >= 0 && i1 < ne1) in
+  ggml_compute_forward_set_rows (llama4/Accelerate row). Pre-existing [ACCEL,CPU]
+  two-backend garbage-compute defect, reproduced identically on base a5eef8209.
+Both must be listed in the final PR notes for PR #2.
+
 ## FINAL DELIVERY: https://github.com/jasonlnheath/llama-cpp-turboquant/pull/2
 Pipeline run 01M444PEW9QFMAC8SQPRK6YMFR completed (outcome: passed-with-override) at head fd7a48806:
 all 9 steps green (review/test/document/lint/push/pr/ci). CI: every hosted leg GREEN except two
