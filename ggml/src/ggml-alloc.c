@@ -938,6 +938,10 @@ static bool ggml_gallocr_reserve_n_impl(
                 galloc->buffers[i] = ggml_vbuffer_alloc(galloc->bufts[i], galloc->buf_tallocs[i], GGML_BACKEND_BUFFER_USAGE_COMPUTE);
                 if (galloc->buffers[i] == NULL) {
                     GGML_LOG_ERROR("%s: failed to allocate %s buffer of size %zu\n", __func__, ggml_backend_buft_name(galloc->bufts[i]), new_size);
+                    // the cached allocation plan refers to the freed buffer, so it
+                    // must not be reused before a successful re-reserve
+                    galloc->n_nodes = 0;
+                    galloc->n_leafs = 0;
                     return false;
                 }
             }
